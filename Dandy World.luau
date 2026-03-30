@@ -15,6 +15,7 @@ type Setting = {
     ESPToon:                boolean,
 
     -- Settings
+    AutoExecute:            boolean,
     SelectPlayer:           string,
     TweenSpeed:             number,
     YPos:                   number,
@@ -917,7 +918,8 @@ do
             Cassade:Form("SetPriority", "PriorityTab", {Title = "Set Priority"})
             Cassade:Form("PriorityFunctions", "PriorityTab", {Title = "Priority"})
 
-        -- Cassade:Tab("SettingTab", "SettingsSection", {Title = "Settings", Icon = Cassade.cassade.Symbols.gearshape})
+        Cassade:Tab("SettingTab", "SettingsSection", {Title = "Settings", Icon = Cassade.cassade.Symbols.gearshape})
+            Cassade:Form("ScriptSettings", "SettingTab", {Title = "Script"})
         --     Cassade:Form("TweenForm", "SettingTab", {Title = "Tween Settings"})
 
         Cassade:CreateSetting("SettingsSection")
@@ -1170,49 +1172,62 @@ do
         end)
     end
 
-    -- do -- Setting Tab
-    --     do -- Tween Settings Form
-    --         do -- tween speed
-    --             local row = Cassade:Row("TweenSpeedRow", "TweenForm", "Tween Speed", "change how fast you fly.")
-    --             local lb = row:Right():Label({Text = math.round(self.Settings.TweenSpeed and self.Settings.TweenSpeed*10 or 30)})
+    do -- Setting Tab
+        -- do -- Tween Settings Form
+        --     do -- tween speed
+        --         local row = Cassade:Row("TweenSpeedRow", "TweenForm", "Tween Speed", "change how fast you fly.")
+        --         local lb = row:Right():Label({Text = math.round(self.Settings.TweenSpeed and self.Settings.TweenSpeed*10 or 30)})
 
-    --             row:Right():Slider({
-    --                 Value = self.Settings.TweenSpeed and self.Settings.TweenSpeed/10 or 0.3,
-    --                 ValueChanged = function(_self, value: number)
-    --                     self.Settings.TweenSpeed = value * 10
-    --                     lb.Text = math.round(self.Settings.TweenSpeed*10)
-    --                 end,
-    --             })
-    --         end
+        --         row:Right():Slider({
+        --             Value = self.Settings.TweenSpeed and self.Settings.TweenSpeed/10 or 0.3,
+        --             ValueChanged = function(_self, value: number)
+        --                 self.Settings.TweenSpeed = value * 10
+        --                 lb.Text = math.round(self.Settings.TweenSpeed*10)
+        --             end,
+        --         })
+        --     end
 
-    --         do -- Y Pos
-    --             local row = Cassade:Row("YPosRow", "TweenForm", "Y position", "farm y distance.")
-    --             local lb = row:Right():Label({Text = math.round(self.Settings.YPos or 15)})
+        --     do -- Y Pos
+        --         local row = Cassade:Row("YPosRow", "TweenForm", "Y position", "farm y distance.")
+        --         local lb = row:Right():Label({Text = math.round(self.Settings.YPos or 15)})
 
-    --             row:Right():Slider({
-    --                 Value = self.Settings.YPos and self.Settings.YPos/30 or 0.5,
-    --                 ValueChanged = function(_self, value: number)
-    --                     self.Settings.YPos = value * 30
-    --                     lb.Text = math.round(self.Settings.YPos)
-    --                 end,
-    --             })
-    --         end
+        --         row:Right():Slider({
+        --             Value = self.Settings.YPos and self.Settings.YPos/30 or 0.5,
+        --             ValueChanged = function(_self, value: number)
+        --                 self.Settings.YPos = value * 30
+        --                 lb.Text = math.round(self.Settings.YPos)
+        --             end,
+        --         })
+        --     end
 
-    --         do -- teleport distance
-    --             local row = Cassade:Row("TeleportDistanceRow", "TweenForm", "Teleport distance", "teleport when distance lower than this.")
-    --             local lb = row:Right():Label({Text = math.round(self.Settings.TeleportAtDistance or 200)})
+        --     do -- teleport distance
+        --         local row = Cassade:Row("TeleportDistanceRow", "TweenForm", "Teleport distance", "teleport when distance lower than this.")
+        --         local lb = row:Right():Label({Text = math.round(self.Settings.TeleportAtDistance or 200)})
 
-    --             row:Right():Slider({
-    --                 Value = self.Settings.TeleportAtDistance and self.Settings.TeleportAtDistance/500 or 0.4,
+        --         row:Right():Slider({
+        --             Value = self.Settings.TeleportAtDistance and self.Settings.TeleportAtDistance/500 or 0.4,
 
-    --                 ValueChanged = function(_self, value: number)
-    --                     self.Settings.TeleportAtDistance = value * 500
-    --                     lb.Text = math.round(self.Settings.TeleportAtDistance)
-    --                 end,
-    --             })
-    --         end
-    --     end
-    -- end
+        --             ValueChanged = function(_self, value: number)
+        --                 self.Settings.TeleportAtDistance = value * 500
+        --                 lb.Text = math.round(self.Settings.TeleportAtDistance)
+        --             end,
+        --         })
+        --     end
+        -- end
+
+        do -- script Form
+            do -- auto execute
+                local row = Cassade:Row("AutoExecuteRow", "Visual", "Auto Execute", "execute script when teleporting to another server.")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoExecute or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoExecute = value
+                    end
+                })
+            end
+        end
+    end
 end
 
 -- ═══════════════════════════════════════════════════════════════
