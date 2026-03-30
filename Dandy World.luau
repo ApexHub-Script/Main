@@ -755,9 +755,9 @@ function PriorityFunctions.AutoPlay()
             self.TPElevater()
         end
     elseif game.PlaceId == SERVERS.Lobby then -- lobby
-        if self._joing then return end
-
         for _, gate in workspace.Elevators:GetChildren() do
+            if self._joing then break end
+
             local avaliable = gate.GuiPart.SurfaceGui.Frame.players.Text:sub(1,1)
 
             if avaliable == "0" then
@@ -767,10 +767,13 @@ function PriorityFunctions.AutoPlay()
                 task.wait(0.1)
                 firetouchinterest(gate.Gate, hrp, false)
                 task.wait(0.1)
-                game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer("VoteMatch")
 
                 return
             end
+        end
+
+        if PlayerGui.MainGui.fillParty.TextMargin.TextLabelVotes.Text:sub(2,2) == "0" then
+            game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer("VoteMatch")
         end
     end
 end
