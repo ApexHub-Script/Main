@@ -1217,7 +1217,7 @@ do
 
         do -- script Form
             do -- auto execute
-                local row = Cassade:Row("AutoExecuteRow", "Visual", "Auto Execute", "execute script when teleporting to another server.")
+                local row = Cassade:Row("AutoExecuteRow", "ScriptSettings", "Auto Execute", "execute script when teleporting to another server.")
 
                 row:Right():Toggle({
                     Value = self.Settings.AutoExecute or false,
