@@ -1,3 +1,5 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 type Setting = {
     -- Priority functions
     AutoPlay:               boolean,
@@ -889,8 +891,6 @@ end
 -- ═══════════════════════════════════════════════════════════════
 --  🔰 INIT 🔰
 -- ═══════════════════════════════════════════════════════════════
-if not game:IsLoaded() then game.Loaded:wait() end
-
 for _, func in InitFunctions do
     local s, r = pcall(func); if not s then warn(r) end
 end
