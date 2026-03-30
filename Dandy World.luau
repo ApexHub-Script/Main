@@ -34,7 +34,7 @@ local PlayerGui = Player:WaitForChild("PlayerGui")
 local AuctusAPI = loadstring(game:HttpGet("https://raw.githubusercontent.com/1makam1/Main/refs/heads/main/AuctusAPI.luau"))()
 
 local GAME = "Dandy World"
-local SCRIPT = `loadstring(game:HttpGet("https://raw.githubusercontent.com/ApexHub-Script/Main/refs/heads/main/{GAME:gsub(" ", "%%")}.luau"))()`
+local SCRIPT = `loadstring(game:HttpGet("https://raw.githubusercontent.com/ApexHub-Script/Main/refs/heads/main/{GAME:gsub(" ", "%%20")}.luau"))()`
 local SERVERS = {
     Lobby = 16116270224,
     InGame = 16552821455
