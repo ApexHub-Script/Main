@@ -490,7 +490,7 @@ function self.SetPriority(func: string?, priority: number?)
     end)
 end
 
-function self.GetClosetMon(monnames: {string})
+function self.GetClosetMon(monnames: {string}?)
     local closetmon
     local closetdistance
 
@@ -498,15 +498,16 @@ function self.GetClosetMon(monnames: {string})
         for _, v in path:GetChildren() do
             local distance = (v:GetPivot().Position - Player.Character.HumanoidRootPart.Position).Magnitude
             local hum = v:FindFirstChild("Humanoid")
+            local validMon = if monnames then table.find(monnames, v.Name) else true
 
-            if table.find(monnames, v.Name) and (not closetdistance or distance < closetdistance) and (hum and  hum.Health > 0) then
+            if validMon and (not closetdistance or distance < closetdistance) and (hum and  hum.Health > 0) then
                 closetmon = v
                 closetdistance = distance
             end
         end
     end
 
-    CheckChildren(workspace.Enemies)
+    CheckChildren(self.room.Monsters)
 
     return closetmon
 end
@@ -651,7 +652,7 @@ function self.GetAvaliableGenerator(): Model
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
         local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
-        local dangerObject
+        local dangerous = false
 
         local function searchDanger(path: Instance)
             for _, obj in path:GetChildren() do
@@ -659,7 +660,7 @@ function self.GetAvaliableGenerator(): Model
                     local objHrp = obj:FindFirstChild("HumanoidRootPart")
 
                     if obj.Name:match(name) and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 20 then
-                        dangerObject = true
+                        dangerous = true
 
                         break
                     end
@@ -667,10 +668,17 @@ function self.GetAvaliableGenerator(): Model
             end
         end
 
+        local closetmon = self.GetClosetMon()
+        local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
+        
+        if monhrp and (monhrp.Position - generator.Prompt.Position).Magnitude < 10 then
+            dangerous = true
+        end
+
         searchDanger(self.room.FreeArea)
         searchDanger(self.room)
 
-        if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerObject then
+        if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerous then
             return generator
         end
     end
