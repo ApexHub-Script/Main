@@ -11,6 +11,7 @@ type Setting = {
     AutoFullBright:         boolean,
     AutoClosePopup:         boolean,
     AutoReady:              boolean,
+    AutoEscapeSquirm:       boolean,
     ESPGenerator:           boolean,
     ESPTwisted:             boolean,
     ESPItem:                boolean,
@@ -490,13 +491,13 @@ function self.SetPriority(func: string?, priority: number?)
     end)
 end
 
-function self.GetClosetMon(monnames: {string}?)
+function self.GetClosetMon(host: BasePart?, monnames: {string}?)
     local closetmon
     local closetdistance
 
     local function CheckChildren(path)
         for _, v in path:GetChildren() do
-            local distance = (v:GetPivot().Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            local distance = (v:GetPivot().Position - (host or Player.Character.HumanoidRootPart).Position).Magnitude
             local hum = v:FindFirstChild("Humanoid")
             local validMon = if monnames then table.find(monnames, v.Name) else true
 
@@ -534,6 +535,8 @@ function self.Noclip(noclip: boolean)
             check(v:GetDescendants())
 
             if v.Name == "Generator" then
+                if not v:FindFirstChild("Model") then continue end
+
                 check(v.Model:GetChildren())
             end
         end
@@ -655,6 +658,8 @@ function self.GetAvaliableGenerator(): Model
         local dangerous = false
 
         local function searchDanger(path: Instance)
+            if dangerous then return end
+
             for _, obj in path:GetChildren() do
                 for _, name in dangerObjName do
                     local objHrp = obj:FindFirstChild("HumanoidRootPart")
@@ -662,16 +667,20 @@ function self.GetAvaliableGenerator(): Model
                     if obj.Name:match(name) and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 20 then
                         dangerous = true
 
-                        break
+                        return
                     end
                 end
             end
         end
 
-        local closetmon = self.GetClosetMon()
+        Color3.fromRGB(255, 200, 200)
+
+        local prompt = generator.Prompt
+        local closetmon = self.GetClosetMon(prompt)
         local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
-        
-        if monhrp and (monhrp.Position - generator.Prompt.Position).Magnitude < 10 then
+        local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
+
+        if monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 20 then
             dangerous = true
         end
 
@@ -722,6 +731,90 @@ function self.TPElevater()
     hrp.CFrame = cf - offset
 end
 
+function self.CreateTwistedIcon(twisted: string)
+	local ScreenGui = Instance.new("ScreenGui")
+	local Icon = Instance.new("ImageLabel")
+	local UICorner = Instance.new("UICorner")
+	local Line = Instance.new("Frame")
+	local DistanceLabel = Instance.new("TextLabel")
+
+	ScreenGui.Name = twisted
+	ScreenGui.Parent = game:GetService("CoreGui")
+	ScreenGui.IgnoreGuiInset = true
+	ScreenGui.ResetOnSpawn = true
+
+	if not self._TwistedIcon then
+		self._TwistedIcon = {}
+	end
+
+	self._TwistedIcon[twisted] = ScreenGui
+
+	Icon.Name = "Icon"
+	Icon.Parent = ScreenGui
+	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	Icon.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Icon.BorderSizePixel = 0
+	Icon.Position = UDim2.new(-1, 0, -1, 0)
+	Icon.Size = UDim2.new(0, 50, 0, 50)
+	Icon.Image = require(game:GetService("ReplicatedStorage").MonsterData[twisted]).Icon
+
+	local IconStroke = Instance.new("UIStroke", Icon)
+	IconStroke.Color = Color3.fromRGB(255, 255, 255)
+	IconStroke.Thickness = 3
+
+	UICorner.CornerRadius = UDim.new(1, 0)
+	UICorner.Parent = Icon
+
+	Line.Name = "Line"
+	Line.Parent = ScreenGui
+	Line.AnchorPoint = Vector2.new(0.5, 0.5)
+	Line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Line.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Line.BorderSizePixel = 0
+	Line.Position = UDim2.new(-1, 0, -1, 0)
+	Line.Size = UDim2.new(0, 100, 0, 100)
+	Line.ZIndex = 0
+
+	DistanceLabel.Name = "DistanceLabel"
+	DistanceLabel.Parent = ScreenGui
+	DistanceLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	DistanceLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	DistanceLabel.BackgroundTransparency = 1
+	DistanceLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	DistanceLabel.BorderSizePixel = 0
+	DistanceLabel.Position = UDim2.new(-1, 0, -1, 0)
+	DistanceLabel.Size = UDim2.new(0, 200, 0, 50)
+	DistanceLabel.Font = Enum.Font.GothamBold
+	DistanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	DistanceLabel.TextSize = 20
+	DistanceLabel.ZIndex = 2
+
+	local DistanceStroke = Instance.new("UIStroke", DistanceLabel)
+	DistanceStroke.Color = Color3.fromRGB(0, 0, 0)
+	DistanceStroke.Thickness = 1
+end
+
+function self.DeleteTwistedIcon(twisted: string)
+	local icon = self._TwistedIcon[twisted]
+
+	if icon then
+		self._TwistedIcon[twisted] = icon:Destroy()
+	end
+end
+
+function self.ClearTwistedIcon()
+    if not self._TwistedIcon then
+        self._TwistedIcon = {}
+    end
+
+	for twisted, icon in self._TwistedIcon do
+		icon:Destroy()
+	end
+
+	table.clear(self._TwistedIcon)
+end
+
 -- ═══════════════════════════════════════════════════════════════
 --  ⭐ PRIORITY FUNCTIONS ⭐
 -- ═══════════════════════════════════════════════════════════════
@@ -757,6 +850,8 @@ function PriorityFunctions.AutoPlay()
                 hrp.AssemblyLinearVelocity = Vector3.zero
 
             elseif geneStats.ActivePlayer.Value ~= Player.Character then
+                self.StopGenerate()
+
                 hrp.Anchored = false
                 hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0))
 
@@ -898,6 +993,137 @@ function AutomationFunctions.AutoReady()
     end
 end
 
+function AutomationFunctions.UpdateTwistedIcon()
+	if not self.room then return end
+    if not self.Settings.ESPTwisted then return end
+
+	local camera = workspace.CurrentCamera
+	local char = Player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local monsters = self.room:FindFirstChild("Monsters")
+
+	if not hrp then return end
+
+	local padding = 30
+	local currentPos = Vector2.new(0, 0)
+
+    if not self._TwistedIcon then
+        self._TwistedIcon = {}
+    end
+
+	for twisted, icon in self._TwistedIcon do
+		local guide = icon.Icon
+		local line = icon.Line
+		local label = icon.DistanceLabel
+
+		local target = monsters and monsters:FindFirstChild(twisted)
+        local targethrp = target and (target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart"))
+
+		if not targethrp then
+			self.DeleteTwistedIcon(twisted)
+
+			continue
+		end
+
+        local targetpos = targethrp.Position
+		local viewportSize = camera.ViewportSize
+		local screenPos, onScreen = camera:WorldToViewportPoint(targetpos)
+
+		local targetPos2D = Vector2.new(screenPos.X, screenPos.Y)
+
+		-- Detect behind camera
+		local isBehind = screenPos.Z < 0
+
+		-- Clamp to screen edges if off-screen or behind
+		if not onScreen or isBehind then
+			local center = viewportSize / 2
+			local dir = targetPos2D - center
+
+			if isBehind then
+				dir = -dir
+			end
+
+			dir = dir.Unit
+
+			-- account for GUI size so it doesn't clip
+			local halfGui = guide.AbsoluteSize / 2
+
+			local limitX = (viewportSize.X / 2) - padding - halfGui.X
+			local limitY = (viewportSize.Y / 2) - padding - halfGui.Y
+
+			local scaleX = limitX / math.abs(dir.X)
+			local scaleY = limitY / math.abs(dir.Y)
+
+			local scale = math.min(scaleX, scaleY)
+
+			targetPos2D = center + dir * scale
+		end
+
+		-- LERP movement (smooth)
+		currentPos = targetPos2D
+
+		guide.Position = UDim2.fromOffset(currentPos.X, currentPos.Y)
+
+		-- === LINE LOGIC ===
+		local center = viewportSize / 2
+		local dir = targetPos2D - center
+		local length = dir.Magnitude
+
+		-- position line at midpoint
+		line.Position = UDim2.fromOffset(
+			center.X + dir.X / 2,
+			center.Y + dir.Y / 2
+		)
+
+		-- set length (width) and thickness
+		line.Size = UDim2.fromOffset(length, 2)
+
+		-- rotate line
+		line.Rotation = math.deg(math.atan2(dir.Y, dir.X))
+
+		-- === DISTANCE LABEL ===
+		label.Position = UDim2.fromOffset(
+			center.X + dir.X / 2,
+			center.Y + dir.Y / 2
+		)
+
+		-- world distance (3D, not screen distance)
+		local worldDistance = (hrp.Position - targetpos).Magnitude
+
+		label.Text = string.format("%.0f Studs", worldDistance)
+
+		-- color change
+		local GB_value = math.min(worldDistance, 255)*4.5
+		local color = Color3.fromRGB(255, GB_value, GB_value)
+		guide.UIStroke.Color = color
+		line.BackgroundColor3 = color
+		label.TextColor3 = color
+	end
+
+    if not monsters then return end
+
+	for _, monster in self.room.Monsters:GetChildren() do
+		if not self._TwistedIcon[monster.Name] then
+			self.CreateTwistedIcon(monster.Name)
+		end
+	end
+end
+
+function AutomationFunctions.AutoEscapeSquirm()
+    local squirmGui = PlayerGui:FindFirstChild("TwistedSquirmEscapeUI")
+
+    if squirmGui and squirmGui.Enabled then
+        self._squirmRight = not self._squirmRight
+
+        if self._squirmRight then
+            AuctusAPI:SendKey(Enum.KeyCode.D)
+
+        else
+            AuctusAPI:SendKey(Enum.KeyCode.A)
+        end
+    end
+end
+
 -- ═══════════════════════════════════════════════════════════════
 --  🔰 INIT 🔰
 -- ═══════════════════════════════════════════════════════════════
@@ -1013,6 +1239,17 @@ do
                     end
                 })
             end
+
+            do -- auto escape Squirm
+                local row = Cassade:Row("AutoEscapeSquirmRow", "AutoFarm", "Auto Escape Squirm")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoEscapeSquirm or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoEscapeSquirm = value
+                    end
+                })
+            end
         end
 
     end
@@ -1037,6 +1274,10 @@ do
                     Value = self.Settings.ESPTwisted or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.ESPTwisted = value
+
+                        if not value then
+                            self.ClearTwistedIcon()
+                        end
                     end
                 })
             end
@@ -1288,6 +1529,7 @@ getgenv().CleanUpApexHub = function()
     self.Noclip(false)
     self.Run(false)
     self.FullBright(false)
+    self.ClearTwistedIcon()
 
     self.ESP(self.room and self.room:FindFirstChild("Generators"), false)
     self.ESP(self.room and self.room:FindFirstChild("Monsters"), false)
