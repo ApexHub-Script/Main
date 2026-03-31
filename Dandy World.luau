@@ -849,9 +849,7 @@ function PriorityFunctions.AutoPlay()
                 hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, 15, 0))
                 hrp.AssemblyLinearVelocity = Vector3.zero
 
-            elseif geneStats.ActivePlayer.Value ~= Player.Character then
-                self.StopGenerate()
-
+            elseif geneStats.ActivePlayer.Value ~= Player.Character and not hrp.Anchored then
                 hrp.Anchored = false
                 hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0))
 
