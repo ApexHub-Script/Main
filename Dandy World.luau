@@ -650,23 +650,25 @@ function self.GetAvaliableGenerator(): Model
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
+        local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
         local dangerObject
 
-        for _, obj in self.room.FreeArea:GetChildren() do
-            if obj.Name == "SproutTendril" and (obj.HumanoidRootPart.Position - generator.Prompt.Position).Magnitude < 20 then
-                dangerObject = true
+        local function searchDanger(path: Instance)
+            for _, obj in path:GetChildren() do
+                for _, name in dangerObjName do
+                    local objHrp = obj:FindFirstChild("HumanoidRootPart")
 
-                break
+                    if obj.Name:match(name) and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 20 then
+                        dangerObject = true
+
+                        break
+                    end
+                end
             end
         end
 
-        for _, obj in self.room:GetChildren() do
-            if obj.Name:match("BassieChunk") and (obj:GetPivot().Position - generator.Prompt.Position).Magnitude < 20 then
-                dangerObject = true
-
-                break
-            end
-        end
+        searchDanger(self.room.FreeArea)
+        searchDanger(self.room)
 
         if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerObject then
             return generator
@@ -743,7 +745,7 @@ function PriorityFunctions.AutoPlay()
                 end
 
                 hrp.Anchored = false
-                hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, 8, 0))
+                hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, 15, 0))
                 hrp.AssemblyLinearVelocity = Vector3.zero
 
             elseif geneStats.ActivePlayer.Value ~= Player.Character then
@@ -1277,6 +1279,7 @@ getgenv().CleanUpApexHub = function()
     self.SaveSetting()
     self.Noclip(false)
     self.Run(false)
+    self.FullBright(false)
 
     self.ESP(self.room and self.room:FindFirstChild("Generators"), false)
     self.ESP(self.room and self.room:FindFirstChild("Monsters"), false)
