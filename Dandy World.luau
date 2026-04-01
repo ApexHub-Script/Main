@@ -691,7 +691,7 @@ function self.GetAvaliableGenerator(): Model
 
             local charHrp = char:FindFirstChild("HumanoidRootPart")
 
-            if charHrp and (charHrp.Position - prompt.Position).Magnitude < 30 then
+            if charHrp and (charHrp.Position - prompt.Position).Magnitude < (charHrp.Anchored and 10 or 20) then
                 dangerous = true
 
                 break
@@ -853,9 +853,7 @@ function PriorityFunctions.AutoPlay()
             local spotted = self.IsChased()
             local geneStats = generator and generator:FindFirstChild("Stats")
 
-            if not geneStats then return end
-
-            if not generator then
+            if not generator or not geneStats then
                 hrp.Anchored = false
                 hrp.CFrame = CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0))
                 hrp.AssemblyLinearVelocity = Vector3.zero
