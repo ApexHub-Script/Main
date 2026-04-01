@@ -12,6 +12,7 @@ type Setting = {
     AutoClosePopup:         boolean,
     AutoReady:              boolean,
     AutoEscapeSquirm:       boolean,
+    AutoSpeedChange:        boolean,
     ESPGenerator:           boolean,
     ESPTwisted:             boolean,
     ESPItem:                boolean,
@@ -22,6 +23,7 @@ type Setting = {
     SelectPlayer:           string,
     TweenSpeed:             number,
     YPos:                   number,
+    SpeedMultiplier:        number,
     TeleportAtDistance:     number,
     Priority:               {Priority: number, Server: string?},
     SortedPriority:         {string},
@@ -598,6 +600,8 @@ function self.ESP(path: Folder, enable: boolean, color: Color3?)
 end
 
 function self.Run(run: boolean)
+    if self.Settings.AutoSpeedChange then return end
+
     local char = Player.Character
     local hum = char and char:FindFirstChild("Humanoid")
     local stats = char and char:FindFirstChild("Stats")
@@ -991,6 +995,28 @@ function AutomationFunctions.AutoRun()
     self.Run(true)
 end
 
+function AutomationFunctions.AutoSpeedChange()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
+    local char = Player.Character
+    local humanoid = char and char:FindFirstChild("Humanoid")
+    local stats = char and char:FindFirstChild("Stats")
+    local runspeed = stats and stats:FindFirstChild("RunSpeed")
+    local sprinting = stats and stats:FindFirstChild("Sprinting")
+    local walkspeed = stats and stats:FindFirstChild("WalkSpeed")
+    local runspeedmodifier = stats and stats:FindFirstChild("RunSpeedModifier")
+    local walkspeedmodifier = stats and stats:FindFirstChild("SpeedModifier")
+
+    if humanoid then
+        if sprinting.Value and runspeed and runspeedmodifier then
+            humanoid.WalkSpeed = (runspeed.Value * runspeedmodifier.Value) * self.Settings.SpeedMultiplier
+
+        elseif not sprinting.Value and walkspeed and walkspeedmodifier then
+            humanoid.WalkSpeed = (walkspeed.Value * walkspeedmodifier.Value) * self.Settings.SpeedMultiplier
+        end
+    end
+end
+
 function AutomationFunctions.FullBright()
     self.FullBright(self.Settings.AutoFullBright)
 end
@@ -1174,6 +1200,9 @@ do
         --     Cassade:Form("PlayersForm", "PlayerTab", {Title = "Players"})
         --     Cassade:Form("PlayerActions", "PlayerTab", {Title = "Actions"})
 
+        Cassade:Tab("Player", "MainSection", {Title = "Local Player", Icon = Cassade.cassade.Symbols.house})
+            Cassade:Form("PlayerSpeed", "Player", {Title = "Player Speed"})
+
         Cassade:Tab("Visual", "MainSection", {Title = "Visual", Icon = Cassade.cassade.Symbols.eye})
             Cassade:Form("ESP", "Visual", {Title = "ESP"})
             Cassade:Form("Visual", "Visual", {Title = "Visual"})
@@ -1240,21 +1269,6 @@ do
                 })
             end
 
-            do -- auto run
-                local row = Cassade:Row("AutoRunRow", "AutoFarm", "Auto Run")
-
-                row:Right():Toggle({
-                    Value = self.Settings.AutoRun or false,
-                    ValueChanged = function(_self, value: boolean)
-                        self.Settings.AutoRun = value
-
-                        if not value then
-                            self.Run(false)
-                        end
-                    end
-                })
-            end
-
             do -- auto close popup
                 local row = Cassade:Row("AutoClosePopupRow", "AutoFarm", "Auto Close Vee Popup")
 
@@ -1278,6 +1292,53 @@ do
             end
         end
 
+    end
+
+    do -- Visual tab
+        do -- Player Speed Form
+            do -- select speed
+                local row = Cassade:Row("SpeedRow", "PlayerSpeed", "Speed Multiplier")
+                local lb = row:Right():Label({Text = string.format("%.1fx", self.Settings.SpeedMultiplier or 1)})
+
+                row:Right():Slider({
+                    Value = self.Settings.SpeedMultiplier and self.Settings.SpeedMultiplier * 2 / 10 or 1,
+                    ValueChanged = function(_self, value: number)
+                        self.Settings.SpeedMultiplier = 10 * value / 2
+                        lb.Text = string.format("%.1fx", self.Settings.SpeedMultiplier)
+                    end,
+                })
+            end
+
+            do -- Auto change speed
+                local row = Cassade:Row("AutoSpeedChangeRow", "PlayerSpeed", "Change Speed")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoSpeedChange or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoSpeedChange = value
+
+                        if not value then
+                            self.Run(false)
+                        end
+                    end
+                })
+            end
+
+            do -- Auto Run
+                local row = Cassade:Row("AutoRunRow", "PlayerSpeed", "Auto Run")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoRun or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoRun = value
+
+                        if not value then
+                            self.Run(false)
+                        end
+                    end
+                })
+            end
+        end
     end
 
     do -- Visual tab
