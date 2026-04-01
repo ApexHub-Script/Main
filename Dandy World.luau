@@ -675,25 +675,12 @@ function self.GetAvaliableGenerator(): Model
             end
         end
 
-        Color3.fromRGB(255, 200, 200)
-
-        local prompt = generator.Prompt
-        local closetmon = self.GetClosetMon(prompt)
-        local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
-        local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
-
-        local no_offense = {"RazzleDazzleMonster", "RodgerMonster"}
-
-        if not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30 then
-            dangerous = true
-        end
-
         for _, char in workspace.InGamePlayers:GetChildren() do
             if char == Player.Character then continue end
 
             local charHrp = char:FindFirstChild("HumanoidRootPart")
 
-            if charHrp and (charHrp.Position - prompt.Position).Magnitude < (charHrp.Anchored and 10 or 20) then
+            if charHrp and (charHrp.Position - generator.Prompt.Position).Magnitude < (charHrp.Anchored and 10 or 20) then
                 dangerous = true
 
                 break
@@ -863,7 +850,15 @@ function PriorityFunctions.AutoPlay()
                 return
             end
 
-            if spotted or tick() - (self._last_spotted or 0) < 5 then
+            local prompt = generator.Prompt
+            local closetmon = self.GetClosetMon(prompt)
+            local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
+            local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
+
+            local no_offense = {"RazzleDazzleMonster", "RodgerMonster"}
+            local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
+
+            if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
                 if geneStats.ActivePlayer.Value == Player.Character then
                     self.StopGenerate()
                 end
@@ -873,12 +868,12 @@ function PriorityFunctions.AutoPlay()
                 end
 
                 hrp.Anchored = false
-                hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, 15, 0))
+                hrp.CFrame = CFrame.new(prompt.Position - Vector3.new(0, 15, 0))
                 hrp.AssemblyLinearVelocity = Vector3.zero
 
             elseif geneStats.ActivePlayer.Value ~= Player.Character and not hrp.Anchored then
                 hrp.Anchored = false
-                hrp.CFrame = CFrame.new(generator.Prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0))
+                hrp.CFrame = CFrame.new(prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0))
 
                 self.Generate(generator)
             end
