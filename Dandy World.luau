@@ -682,7 +682,9 @@ function self.GetAvaliableGenerator(): Model
         local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
         local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
 
-        if monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30 then
+        local no_offense = {"RazzleDazzleMonster", "RodgerMonster"}
+
+        if not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30 then
             dangerous = true
         end
 
