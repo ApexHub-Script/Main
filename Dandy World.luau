@@ -651,6 +651,8 @@ function self.FloorActive()
 end
 
 function self.GetAvaliableGenerator(): Model
+    local avaliable_generators = {}
+
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
@@ -688,9 +690,11 @@ function self.GetAvaliableGenerator(): Model
         searchDanger(self.room)
 
         if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerous then
-            return generator
+            table.insert(avaliable_generators, generator)
         end
     end
+
+    return avaliable_generators[(tonumber(Player.Name:sub(19)) or 0) + 1]
 end
 
 function self.Generate(generator)
