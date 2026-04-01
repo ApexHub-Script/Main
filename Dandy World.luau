@@ -656,7 +656,7 @@ function self.GetAvaliableGenerator(): Model
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
-        local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
+        local dangerObjName = {"SproutTendril", "Bassie", "BlotHandZone"}
         local dangerous = false
 
         local function searchDanger(path: Instance)
