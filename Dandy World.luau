@@ -1015,7 +1015,7 @@ function AutomationFunctions.AutoReady()
 end
 
 function AutomationFunctions.UpdateTwistedIcon()
-	if not self.room then return end
+	if not self.room then self.ClearTwistedIcon() return end
     if not self.Settings.ESPTwisted then return end
 
 	local camera = workspace.CurrentCamera
