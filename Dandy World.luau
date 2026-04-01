@@ -1134,13 +1134,16 @@ function AutomationFunctions.AutoEscapeSquirm()
     local squirmGui = PlayerGui:FindFirstChild("TwistedSquirmEscapeUI")
 
     if squirmGui and squirmGui.Enabled then
-        self._squirmRight = not self._squirmRight
+        if not self._last_squirm or tick() - self._last_squirm > 0.1 then
+            self._last_squirm = tick()
+            self._squirmRight = not self._squirmRight
 
-        if self._squirmRight then
-            AuctusAPI:SendKey(Enum.KeyCode.D)
+            if self._squirmRight then
+                AuctusAPI:SendKey(Enum.KeyCode.D)
 
-        else
-            AuctusAPI:SendKey(Enum.KeyCode.A)
+            else
+                AuctusAPI:SendKey(Enum.KeyCode.A)
+            end
         end
     end
 end
