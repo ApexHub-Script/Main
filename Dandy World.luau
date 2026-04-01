@@ -659,6 +659,8 @@ function self.GetAvaliableGenerator(): Model
         local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
         local dangerous = false
 
+        if stats.Connie.Value then continue end
+
         local function searchDanger(path: Instance)
             if dangerous then return end
 
