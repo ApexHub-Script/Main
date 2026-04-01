@@ -690,7 +690,7 @@ function self.GetAvaliableGenerator(): Model
         searchDanger(self.room.FreeArea)
         searchDanger(self.room)
 
-        if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerous then
+        if stats and not stats.Completed.Value and (not activePlr and not dangerous) or activePlr == Player.Character then
             return generator
 
             --table.insert(avaliable_generators, generator)
