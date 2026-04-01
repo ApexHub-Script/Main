@@ -656,7 +656,7 @@ function self.GetAvaliableGenerator(): Model
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
-        local dangerObjName = {"SproutTendril", "Bassie", "BlotHandZone"}
+        local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
         local dangerous = false
 
         local function searchDanger(path: Instance)
@@ -689,6 +689,7 @@ function self.GetAvaliableGenerator(): Model
 
         searchDanger(self.room.FreeArea)
         searchDanger(self.room)
+        searchDanger(workspace)
 
         if stats and not stats.Completed.Value and ((not activePlr and not dangerous) or activePlr == Player.Character) then
             return generator
@@ -855,7 +856,7 @@ function PriorityFunctions.AutoPlay()
             local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
             local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
 
-            local no_offense = {"RazzleDazzleMonster", "RodgerMonster"}
+            local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
             local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
 
             if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
