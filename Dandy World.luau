@@ -651,7 +651,7 @@ function self.FloorActive()
 end
 
 function self.GetAvaliableGenerator(): Model
-    local avaliable_generators = {}
+    --local avaliable_generators = {}
 
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator:FindFirstChild("Stats")
@@ -682,19 +682,35 @@ function self.GetAvaliableGenerator(): Model
         local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
         local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
 
-        if monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 20 then
+        if monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30 then
             dangerous = true
+        end
+
+        for _, char in workspace.InGamePlayers:GetChildren() do
+            if char == Player.Character then continue end
+
+            local charHrp = char:FindFirstChild("HumanoidRootPart")
+
+            if charHrp and (charHrp.Position - prompt.Position).Magnitude < 30 then
+                dangerous = true
+
+                break
+            end
         end
 
         searchDanger(self.room.FreeArea)
         searchDanger(self.room)
 
         if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerous then
-            table.insert(avaliable_generators, generator)
+            return generator
+
+            --table.insert(avaliable_generators, generator)
         end
     end
 
-    return avaliable_generators[(tonumber(Player.Name:sub(19)) or 0) + 1]
+    --local helper_number = Player.Name:gsub("DandyWorldHelper", "")
+
+    --return avaliable_generators[(tonumber(helper_number) or 0) + 1]
 end
 
 function self.Generate(generator)
@@ -837,8 +853,15 @@ function PriorityFunctions.AutoPlay()
             local spotted = self.IsChased()
             local geneStats = generator and generator:FindFirstChild("Stats")
 
-            if not generator then self.TPElevater() return end
             if not geneStats then return end
+
+            if not generator then
+                hrp.Anchored = false
+                hrp.CFrame = CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0))
+                hrp.AssemblyLinearVelocity = Vector3.zero
+
+                return
+            end
 
             if spotted or tick() - (self._last_spotted or 0) < 5 then
                 if geneStats.ActivePlayer.Value == Player.Character then
