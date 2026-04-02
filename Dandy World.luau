@@ -871,14 +871,14 @@ function PriorityFunctions.AutoPlay()
             end
 
             local prompt = generator.Prompt
-            -- local closetmon = self.GetClosetMon(prompt)
-            -- local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
-            -- local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
+            local closetmon = self.GetClosetMon(prompt)
+            local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
+            local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
 
-            -- local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
-            -- local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
+            local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
+            local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
 
-            if spotted or tick() - (self._last_spotted or 0) < 5 then --or is_mon_close then
+            if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
                 if geneStats.ActivePlayer.Value == Player.Character then
                     self.StopGenerate()
                 end
