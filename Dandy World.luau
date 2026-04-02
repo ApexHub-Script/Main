@@ -937,7 +937,19 @@ function PriorityFunctions.AutoPlay()
                 for _, v in self.room.Monsters:GetChildren() do
                     if v.Name == "RazzleDazzleMonster" or v.Name == "RodgerMonster" or v.Name == "BlottMonster" then continue end
 
+                    if v:FindFirstChild("Grabbing") and v.Grabbing.Value then
+                        self._last_long_atk = tick()
+
+                        break
+                    end
+
                     table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 20, 0))
+                end
+
+                if tick() - self._last_long_atk < 2 then
+                    self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
+
+                    return
                 end
 
                 local s = self.getFarthestPair(monpos)
