@@ -928,7 +928,6 @@ function PriorityFunctions.AutoPlay()
                     self._distractor_start_pos = hrp.CFrame
                 end
 
-                local radius = 15
                 local monpos = {}
 
                 if not self._StepC then self._StepC = 0 end
