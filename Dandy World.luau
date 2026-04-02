@@ -861,7 +861,7 @@ function PriorityFunctions.AutoPlay()
     if game.PlaceId == SERVERS.InGame then -- in game
         if self.FloorActive() then
 
-            if tick() - (self._last_generator_check or 0) > 0.3 then
+            if tick() - (self._last_generator_check or 0) > 0.2 then
                 self._last_generator_check = tick()
                 self._last_generator = self.GetAvaliableGenerator()
             end
@@ -878,7 +878,7 @@ function PriorityFunctions.AutoPlay()
                 return
             end
 
-            if tick() - (self._last_mon_close_check or 0) > 0.3 then
+            if tick() - (self._last_mon_close_check or 0) > 0.1 then
                 self._last_mon_close_check = tick()
 
                 local closetmon = self.GetClosetMon(prompt)
