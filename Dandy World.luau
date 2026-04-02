@@ -946,7 +946,7 @@ function PriorityFunctions.AutoPlay()
                     table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 20, 0))
                 end
 
-                if tick() - self._last_long_atk < 2 then
+                if tick() - (self._last_long_atk or 0) < 2 then
                     self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
 
                     return
