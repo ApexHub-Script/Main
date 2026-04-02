@@ -946,7 +946,20 @@ function PriorityFunctions.AutoPlay()
                     table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 15, 0))
                 end
 
-                if tick() - (self._last_long_atk or 0) < 2 then
+                for _, v in self.room.FreeArea:GetChildren() do
+                    if v.Name == "SproutTendril" then
+                        local dist = (v.HumanoidRootPart.Position - hrp.Position).Magnitude
+                        local attacking = v:FindFirstChild("Attacking")
+
+                        if attacking and attacking.Value and dist < 20 then
+                            self._last_long_atk = tick()
+
+                            break
+                        end
+                    end
+                end
+
+                if tick() - (self._last_long_atk or 0) < 1 then
                     self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
 
                     return
