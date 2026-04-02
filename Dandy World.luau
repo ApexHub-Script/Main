@@ -860,17 +860,9 @@ function PriorityFunctions.AutoPlay()
 
     if game.PlaceId == SERVERS.InGame then -- in game
         if self.FloorActive() then
-
-            if tick() - (self._last_generator_check or 0) > 0.2 then
-                self._last_generator_check = tick()
-                self._last_generator = self.GetAvaliableGenerator()
-            end
-
-            local generator = self._last_generator
+            local generator = self.GetAvaliableGenerator()
             local spotted = self.IsChased()
             local geneStats = generator and generator:FindFirstChild("Stats")
-            local prompt = generator and generator:FindFirstChild("Prompt")
-            local is_mon_close
 
             if not generator or not geneStats then
                 self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
@@ -878,16 +870,13 @@ function PriorityFunctions.AutoPlay()
                 return
             end
 
-            if tick() - (self._last_mon_close_check or 0) > 0.1 then
-                self._last_mon_close_check = tick()
+            local prompt = generator.Prompt
+            local closetmon = self.GetClosetMon(prompt)
+            local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
+            local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
 
-                local closetmon = self.GetClosetMon(prompt)
-                local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
-                local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
-                local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
-
-                is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
-            end
+            local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
+            local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
 
             if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
                 if geneStats.ActivePlayer.Value == Player.Character then
