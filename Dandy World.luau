@@ -879,7 +879,7 @@ function PriorityFunctions.AutoPlay()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChild("Humanoid")
 
-    local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster", "ConnieMonster"}
+    local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster", "ConnieMonster", "SquirmMonster"}
 
     if game.PlaceId == SERVERS.InGame then -- in game
         if self.FloorActive() then
