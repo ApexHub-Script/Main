@@ -655,8 +655,6 @@ function self.FloorActive()
 end
 
 function self.GetAvaliableGenerator(): Model
-    --local avaliable_generators = {}
-
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
@@ -699,14 +697,8 @@ function self.GetAvaliableGenerator(): Model
 
         if stats and not stats.Completed.Value and ((not activePlr and not dangerous) or activePlr == Player.Character) then
             return generator
-
-            --table.insert(avaliable_generators, generator)
         end
     end
-
-    --local helper_number = Player.Name:gsub("DandyWorldHelper", "")
-
-    --return avaliable_generators[(tonumber(helper_number) or 0) + 1]
 end
 
 function self.Generate(generator)
@@ -731,6 +723,27 @@ function self.StopGenerate()
             stats.StopInteracting:FireServer("Stop")
         end
     end
+end
+
+function self.TPNoDanger(des)
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not hrp then return end
+
+    for _, obj in self.room.FreeArea:GetChildren() do
+        local objHrp = obj:FindFirstChild("HumanoidRootPart")
+
+        if obj.Name == "SproutTendril" and ((objHrp and objHrp.Position or obj:GetPivot().Position) - des.Position).Magnitude < 20 then
+            self.TPNoDanger(des - Vector3.new(0, 15, 0))
+
+            return
+        end
+    end
+
+    hrp.Anchored = false
+    hrp.CFrame = des
+    hrp.AssemblyLinearVelocity = Vector3.zero
 end
 
 function self.TPElevater()
@@ -850,9 +863,7 @@ function PriorityFunctions.AutoPlay()
             local geneStats = generator and generator:FindFirstChild("Stats")
 
             if not generator or not geneStats then
-                hrp.Anchored = false
-                hrp.CFrame = CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0))
-                hrp.AssemblyLinearVelocity = Vector3.zero
+                self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
 
                 return
             end
@@ -874,15 +885,14 @@ function PriorityFunctions.AutoPlay()
                     self._last_spotted = tick()
                 end
 
-                hrp.Anchored = false
-                hrp.CFrame = CFrame.new(prompt.Position - Vector3.new(0, 15, 0))
-                hrp.AssemblyLinearVelocity = Vector3.zero
+                self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, 15, 0)))
 
             elseif geneStats.ActivePlayer.Value ~= Player.Character and not hrp.Anchored then
-                hrp.Anchored = false
-                hrp.CFrame = CFrame.new(prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0))
-
+                self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0)))
                 self.Generate(generator)
+
+            elseif geneStats.ActivePlayer.Value == Player.Character then
+                self.TPNoDanger(generator.ScrapsAttachPoint.CFrame)
             end
 
         elseif stats and not stats.InElevator.Value then
