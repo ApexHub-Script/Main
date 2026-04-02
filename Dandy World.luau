@@ -673,7 +673,7 @@ function self.GetAvaliableGenerator(): Model
                 for _, name in dangerObjName do
                     local objHrp = obj:FindFirstChild("HumanoidRootPart")
 
-                    if obj.Name:match(name) and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 20 then
+                    if obj.Name:match(name) and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 30 then
                         dangerous = true
 
                         return
@@ -848,20 +848,14 @@ function self.ClearTwistedIcon()
 end
 
 function self.getFarthestPair(points: {Vector3})
-    if #points == 1 then return 0 end
-
 	local maxDist = -math.huge
-	local p1, p2 = nil, nil
 
 	for i = 1, #points do
-		for j = i + 1, #points do
-			local dist = (points[i] - points[j]).Magnitude
-			if dist > maxDist then
-				maxDist = dist
-				p1 = points[i]
-				p2 = points[j]
-			end
-		end
+		local dist = (points[i] - self._farthest_from_gen).Magnitude
+
+        if dist > maxDist then
+            maxDist = dist
+        end
 	end
 
 	return maxDist
@@ -890,6 +884,7 @@ function PriorityFunctions.AutoPlay()
 
                 if self._distractor_start_pos then
                     self._distractor_start_pos = nil
+                    self._farthest_from_gen = nil
                 end
 
                 if not generator or not geneStats then
@@ -924,15 +919,27 @@ function PriorityFunctions.AutoPlay()
                 end
 
             elseif self.Settings.AutoPlayMode == "Distractor" then -- distractor mode
+
                 if not self._distractor_start_pos then
                     self._distractor_start_pos = hrp.CFrame
                 end
 
-                local radius = 15
-                local monpos = {}
+                if not self._farthest_from_gen then
+                    for _, v in self.room.Monsters:GetChildren() do
+                        if table.find(no_offense, v.Name) then continue end
 
-                if not self._StepC then self._StepC = 0 end
-                self._StepC += math.rad(3)
+                        for _, gen in self.room.Generators:GetChildren() do
+                            local old_ds = self._farthest_from_gen and (self._farthest_from_gen - gen.Prompt.Position).Magnitude
+                            local ds = (v.HumanoidRootPart.Position - gen.Prompt.Position).Magnitude
+
+                            if not old_ds or ds > old_ds then
+                                self._farthest_from_gen = v.HumanoidRootPart.Position
+                            end
+                        end
+                    end
+                end
+
+                local monpos = {}
 
                 for _, v in self.room.Monsters:GetChildren() do
                     if table.find(no_offense, v.Name) then continue end
@@ -953,13 +960,14 @@ function PriorityFunctions.AutoPlay()
 
                         if attacking and attacking.Value and dist < 20 then
                             self._last_long_atk = tick()
+                            self._farthest_from_gen = nil
 
                             break
                         end
                     end
                 end
 
-                if tick() - (self._last_long_atk or 0) < 1.5 then
+                if tick() - (self._last_long_atk or 0) < 2 then
                     self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
 
                     return
@@ -970,31 +978,25 @@ function PriorityFunctions.AutoPlay()
                 if s > 20 then
                     if not self._monster_step then self._monster_step = 0 end
 
-                    if not self._last_mon_step or tick() - self._last_mon_step > 0.1 then
+                    if not self._last_mon_step or tick() - self._last_mon_step > (self._on_farthest_pos and 0.3 or 0.1) then
                         self._last_mon_step = tick()
                         self._monster_step += 1
+
+                        if self._on_farthest_pos then
+                            self._on_farthest_pos = false
+                            self._monster_step = 1
+                        end
                     end
 
                     if self._monster_step > #monpos then
-                        self._monster_step = 1
+                        self._on_farthest_pos = true
                     end
 
-                    hrp.CFrame = CFrame.new(monpos[self._monster_step])
+                    hrp.CFrame = CFrame.new(self._on_farthest_pos and self._farthest_from_gen + Vector3.new(0, 15, 0) or monpos[self._monster_step])
                     hrp.AssemblyLinearVelocity = Vector3.zero
 
-                    self._center_mon_pos = nil
-
                 else
-                    if not self._center_mon_pos then
-                        self._center_mon_pos = CFrame.new(monpos[1])
-                    end
-
-                    local cf = self._center_mon_pos or CFrame.new(monpos[1])
-                    local offset
-                    offset = (cf * CFrame.Angles(0, self._StepC, 0) * CFrame.new(radius, 0, 0)).Position - cf.Position
-                    offset = Vector3.new(offset.X, 0, offset.Z)
-
-                    hrp.CFrame = CFrame.new(cf.Position + offset)
+                    hrp.CFrame = CFrame.new(self._farthest_from_gen + Vector3.new(0, 15, 0))
                     hrp.AssemblyLinearVelocity = Vector3.zero
                 end
             end
@@ -1002,8 +1004,9 @@ function PriorityFunctions.AutoPlay()
         elseif stats and not stats.InElevator.Value then
             self.TPElevater()
 
-            if self._center_mon_pos then
-                self._center_mon_pos = nil
+            if self._farthest_from_gen then
+                self._farthest_from_gen = nil
+                self._distractor_start_pos = nil
             end
         end
 
@@ -1372,6 +1375,7 @@ do
                             hrp.AssemblyLinearVelocity = Vector3.zero
 
                             self._distractor_start_pos = nil
+                            self._farthest_from_gen = nil
                         end
                     end
                 })
