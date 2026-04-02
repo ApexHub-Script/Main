@@ -879,6 +879,8 @@ function PriorityFunctions.AutoPlay()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChild("Humanoid")
 
+    local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster", "ConnieMonster"}
+
     if game.PlaceId == SERVERS.InGame then -- in game
         if self.FloorActive() then
             if self.Settings.AutoPlayMode == "Normal" then -- normal mode
@@ -900,8 +902,6 @@ function PriorityFunctions.AutoPlay()
                 local closetmon = self.GetClosetMon(prompt)
                 local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
                 local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
-
-                local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
                 local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
 
                 if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
@@ -935,7 +935,7 @@ function PriorityFunctions.AutoPlay()
                 self._StepC += math.rad(5)
 
                 for _, v in self.room.Monsters:GetChildren() do
-                    if v.Name == "RazzleDazzleMonster" or v.Name == "RodgerMonster" or v.Name == "BlottMonster" then continue end
+                    if table.find(no_offense, v.Name) then continue end
 
                     if v:FindFirstChild("Grabbing") and v.Grabbing.Value then
                         self._last_long_atk = tick()
