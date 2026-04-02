@@ -955,12 +955,19 @@ function PriorityFunctions.AutoPlay()
                 local s = self.getFarthestPair(monpos)
 
                 if s > 10 then
-                    for _, pos in monpos do
-                        hrp.CFrame = CFrame.new(pos)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
+                    if not self._monster_step then self._monster_step = 0 end
 
-                        task.wait(0.1)
+                    if not self._last_mon_step or tick() - self._last_mon_step > 0.1 then
+                        self._last_mon_step = tick()
+                        self._monster_step += 1
                     end
+
+                    if self._monster_step > #monpos then
+                        self._monster_step = 1
+                    end
+
+                    hrp.CFrame = CFrame.new(monpos[self._monster_step])
+                    hrp.AssemblyLinearVelocity = Vector3.zero
 
                     self._center_mon_pos = nil
 
