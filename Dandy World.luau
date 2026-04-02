@@ -870,6 +870,9 @@ function PriorityFunctions.AutoPlay()
                 return
             end
 
+            if self._last_autoplay and tick() - self._last_autoplay < 0.1 then return end
+            self._last_autoplay = tick()
+
             local prompt = generator.Prompt
             local closetmon = self.GetClosetMon(prompt)
             local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
