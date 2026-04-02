@@ -848,6 +848,8 @@ function self.ClearTwistedIcon()
 end
 
 function self.getFarthestPair(points: {Vector3})
+    if #points == 1 then return 0 end
+
 	local maxDist = -math.huge
 	local p1, p2 = nil, nil
 
@@ -862,7 +864,7 @@ function self.getFarthestPair(points: {Vector3})
 		end
 	end
 
-	return p1, p2, maxDist
+	return maxDist
 end
 
 -- ═══════════════════════════════════════════════════════════════
@@ -938,14 +940,14 @@ function PriorityFunctions.AutoPlay()
                     table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 20, 0))
                 end
 
-                local _, _, s = self.getFarthestPair(monpos)
+                local s = self.getFarthestPair(monpos)
 
                 if s > 10 then
                     for _, pos in monpos do
-                    hrp.CFrame = CFrame.new(pos)
-                    hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.CFrame = CFrame.new(pos)
+                        hrp.AssemblyLinearVelocity = Vector3.zero
 
-                    task.wait(0.1)
+                        task.wait(0.1)
                     end
 
                     self._center_mon_pos = nil
@@ -967,6 +969,10 @@ function PriorityFunctions.AutoPlay()
 
         elseif stats and not stats.InElevator.Value then
             self.TPElevater()
+
+            if self._center_mon_pos then
+                self._center_mon_pos = nil
+            end
         end
 
     elseif game.PlaceId == SERVERS.Lobby then -- lobby
