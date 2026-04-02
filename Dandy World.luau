@@ -928,7 +928,7 @@ function PriorityFunctions.AutoPlay()
                     self._distractor_start_pos = hrp.CFrame
                 end
 
-                local radius = 20
+                local radius = 15
                 local monpos = {}
 
                 if not self._StepC then self._StepC = 0 end
@@ -943,7 +943,7 @@ function PriorityFunctions.AutoPlay()
                         break
                     end
 
-                    table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 20, 0))
+                    table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 15, 0))
                 end
 
                 if tick() - (self._last_long_atk or 0) < 2 then
