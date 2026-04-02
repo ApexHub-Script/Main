@@ -989,12 +989,7 @@ function PriorityFunctions.AutoPlay()
                         self._center_mon_pos = CFrame.new(monpos[1])
                     end
 
-                    local cf = self._center_mon_pos or CFrame.new(monpos[1])
-                    local offset
-                    offset = (cf * CFrame.Angles(0, self._StepC, 0) * CFrame.new(radius, 0, 0)).Position - cf.Position
-                    offset = Vector3.new(offset.X, 0, offset.Z)
-
-                    hrp.CFrame = CFrame.new(cf.Position + offset)
+                    hrp.CFrame = self._center_mon_pos
                     hrp.AssemblyLinearVelocity = Vector3.zero
                 end
             end
