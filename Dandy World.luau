@@ -902,7 +902,7 @@ function PriorityFunctions.AutoPlay()
                 local closetmon = self.GetClosetMon(prompt)
                 local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
                 local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
-                local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
+                local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 15
 
                 if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
                     if geneStats.ActivePlayer.Value == Player.Character then
@@ -922,16 +922,17 @@ function PriorityFunctions.AutoPlay()
                 elseif geneStats.ActivePlayer.Value == Player.Character then
                     self.TPNoDanger(generator.ScrapsAttachPoint.CFrame)
                 end
-            
+
             elseif self.Settings.AutoPlayMode == "Distractor" then -- distractor mode
                 if not self._distractor_start_pos then
                     self._distractor_start_pos = hrp.CFrame
                 end
 
+                local radius = 15
                 local monpos = {}
 
                 if not self._StepC then self._StepC = 0 end
-                self._StepC += math.rad(5)
+                self._StepC += math.rad(3)
 
                 for _, v in self.room.Monsters:GetChildren() do
                     if table.find(no_offense, v.Name) then continue end
@@ -988,7 +989,12 @@ function PriorityFunctions.AutoPlay()
                         self._center_mon_pos = CFrame.new(monpos[1])
                     end
 
-                    hrp.CFrame = self._center_mon_pos
+                    local cf = self._center_mon_pos or CFrame.new(monpos[1])
+                    local offset
+                    offset = (cf * CFrame.Angles(0, self._StepC, 0) * CFrame.new(radius, 0, 0)).Position - cf.Position
+                    offset = Vector3.new(offset.X, 0, offset.Z)
+
+                    hrp.CFrame = CFrame.new(cf.Position + offset)
                     hrp.AssemblyLinearVelocity = Vector3.zero
                 end
             end
