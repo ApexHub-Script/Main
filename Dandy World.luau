@@ -22,6 +22,7 @@ type Setting = {
     AutoExecute:            boolean,
     SelectPlayer:           string,
     TweenSpeed:             number,
+    AutoPlayMode:           "Normal" | "Distractor",
     YPos:                   number,
     SpeedMultiplier:        number,
     TeleportAtDistance:     number,
@@ -846,6 +847,24 @@ function self.ClearTwistedIcon()
 	table.clear(self._TwistedIcon)
 end
 
+function self.getFarthestPair(points: {Vector3})
+	local maxDist = -math.huge
+	local p1, p2 = nil, nil
+
+	for i = 1, #points do
+		for j = i + 1, #points do
+			local dist = (points[i] - points[j]).Magnitude
+			if dist > maxDist then
+				maxDist = dist
+				p1 = points[i]
+				p2 = points[j]
+			end
+		end
+	end
+
+	return p1, p2, maxDist
+end
+
 -- ═══════════════════════════════════════════════════════════════
 --  ⭐ PRIORITY FUNCTIONS ⭐
 -- ═══════════════════════════════════════════════════════════════
@@ -860,46 +879,96 @@ function PriorityFunctions.AutoPlay()
 
     if game.PlaceId == SERVERS.InGame then -- in game
         if self.FloorActive() then
-            local generator = self.GetAvaliableGenerator()
-            local spotted = self.IsChased()
-            local geneStats = generator and generator:FindFirstChild("Stats")
+            if self.Settings.AutoPlayMode == "Normal" then -- normal mode
+                local generator = self.GetAvaliableGenerator()
+                local spotted = self.IsChased()
+                local geneStats = generator and generator:FindFirstChild("Stats")
 
-            if not generator or not geneStats then
-                self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
-
-                return
-            end
-
-            local prompt = generator.Prompt
-            local closetmon = self.GetClosetMon(prompt)
-            local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
-            local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
-
-            local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
-            local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
-
-            if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
-                if geneStats.ActivePlayer.Value == Player.Character then
-                    self.StopGenerate()
+                if self._distractor_start_pos then
+                    self._distractor_start_pos = nil
                 end
 
-                if spotted then
-                    self._last_spotted = tick()
+                if not generator or not geneStats then
+                    self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
+
+                    return
                 end
 
-                self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, 15, 0)))
+                local prompt = generator.Prompt
+                local closetmon = self.GetClosetMon(prompt)
+                local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
+                local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
 
-            elseif geneStats.ActivePlayer.Value ~= Player.Character and not hrp.Anchored then
-                self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0)))
-                self.Generate(generator)
+                local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster"}
+                local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 30
 
-            elseif geneStats.ActivePlayer.Value == Player.Character then
-                self.TPNoDanger(generator.ScrapsAttachPoint.CFrame)
+                if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
+                    if geneStats.ActivePlayer.Value == Player.Character then
+                        self.StopGenerate()
+                    end
+
+                    if spotted then
+                        self._last_spotted = tick()
+                    end
+
+                    self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, 15, 0)))
+
+                elseif geneStats.ActivePlayer.Value ~= Player.Character and not hrp.Anchored then
+                    self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0)))
+                    self.Generate(generator)
+
+                elseif geneStats.ActivePlayer.Value == Player.Character then
+                    self.TPNoDanger(generator.ScrapsAttachPoint.CFrame)
+                end
+            
+            elseif self.Settings.AutoPlayMode == "Distractor" then -- distractor mode
+                if not self._distractor_start_pos then
+                    self._distractor_start_pos = hrp.CFrame
+                end
+
+                local radius = 20
+                local monpos = {}
+
+                if not self._StepC then self._StepC = 0 end
+                self._StepC += math.rad(5)
+
+                for _, v in self.room.Monsters:GetChildren() do
+                    if v.Name == "RazzleDazzleMonster" or v.Name == "RodgerMonster" or v.Name == "BlottMonster" then continue end
+
+                    table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 20, 0))
+                end
+
+                local _, _, s = self.getFarthestPair(monpos)
+
+                if s > 10 then
+                    for _, pos in monpos do
+                    hrp.CFrame = CFrame.new(pos)
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+
+                    task.wait(0.1)
+                    end
+
+                    self._center_mon_pos = nil
+
+                else
+                    if not self._center_mon_pos then
+                        self._center_mon_pos = CFrame.new(monpos[1])
+                    end
+
+                    local cf = self._center_mon_pos or CFrame.new(monpos[1])
+                    local offset
+                    offset = (cf * CFrame.Angles(0, self._StepC, 0) * CFrame.new(radius, 0, 0)).Position - cf.Position
+                    offset = Vector3.new(offset.X, 0, offset.Z)
+
+                    hrp.CFrame = CFrame.new(cf.Position + offset)
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                end
             end
 
         elseif stats and not stats.InElevator.Value then
             self.TPElevater()
         end
+
     elseif game.PlaceId == SERVERS.Lobby then -- lobby
         for _, gate in workspace.Elevators:GetChildren() do
             if self._joing then break end
@@ -1233,7 +1302,17 @@ do
     do -- Automation tab
 
         do -- Settings Form
+            do -- select auto play mode
+                local row = Cassade:Row("SelectAutoPlayMode", "AutoFarmSettings", "Auto Play Mode")
 
+                row:Right():PopUpButton({
+                    Options = {"Normal", "Distractor"},
+                    Value = self.Settings.AutoPlayMode == "Distractor" and 2 or 1,
+                    ValueChanged = function(_self, value: number)
+                        self.Settings.AutoPlayMode = _self.Options[value]
+                    end,
+                })
+            end
         end
 
         do -- Auto Farm Form
@@ -1244,6 +1323,18 @@ do
                     Value = self.Settings.AutoPlay or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoPlay = value
+
+                        if not value and self._distractor_start_pos then
+                            local char = Player.Character
+                            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+                            if not hrp then return end
+
+                            hrp.CFrame = self._distractor_start_pos
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+
+                            self._distractor_start_pos = nil
+                        end
                     end
                 })
             end
