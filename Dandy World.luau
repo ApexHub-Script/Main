@@ -954,7 +954,7 @@ function PriorityFunctions.AutoPlay()
 
                 local s = self.getFarthestPair(monpos)
 
-                if s > 10 then
+                if s > 20 then
                     if not self._monster_step then self._monster_step = 0 end
 
                     if not self._last_mon_step or tick() - self._last_mon_step > 0.1 then
