@@ -1019,7 +1019,7 @@ function AutomationFunctions.AutoSpeedChange()
     local runspeedmodifier = stats and stats:FindFirstChild("RunSpeedModifier")
     local walkspeedmodifier = stats and stats:FindFirstChild("SpeedModifier")
 
-    if humanoid then
+    if humanoid and sprinting then
         if sprinting.Value and runspeed and runspeedmodifier then
             humanoid.WalkSpeed = (runspeed.Value * runspeedmodifier.Value) * self.Settings.SpeedMultiplier
 
