@@ -959,7 +959,7 @@ function PriorityFunctions.AutoPlay()
                     end
                 end
 
-                if tick() - (self._last_long_atk or 0) < 1 then
+                if tick() - (self._last_long_atk or 0) < 1.5 then
                     self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 10, 0)))
 
                     return
