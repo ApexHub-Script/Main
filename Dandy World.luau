@@ -920,6 +920,29 @@ function PriorityFunctions.AutoPlay()
 
             elseif self.Settings.AutoPlayMode == "Distractor" then -- distractor mode
 
+                local info = workspace.Info
+                local gen_c = info.GeneratorsCompleted.Value
+
+                if self._last_gen_c ~= gen_c then
+                    self._last_gen_c = gen_c
+                    self._last_gen_c_change = tick()
+                end
+
+                if self._last_gen_c_change and tick() - self._last_gen_c_change > 30 then
+                    self._last_gen_c_change = tick()
+                    self._farthest_from_gen = nil
+
+                    for _, v in self.room.Generators:GetChildren() do
+                        if v.Stats.Completed.Value then
+                            local gen_pos = v.ScrapsAttachPoint.CFrame
+
+                            self._farthest_from_gen = gen_pos.Position - gen_pos.LookVector * 3
+
+                            break
+                        end
+                    end
+                end
+
                 if not self._distractor_start_pos then
                     self._distractor_start_pos = hrp.CFrame
                 end
@@ -992,11 +1015,11 @@ function PriorityFunctions.AutoPlay()
                         self._on_farthest_pos = true
                     end
 
-                    hrp.CFrame = CFrame.new(self._on_farthest_pos and self._farthest_from_gen + Vector3.new(0, 15, 0) or monpos[self._monster_step])
+                    hrp.CFrame = CFrame.new(self._on_farthest_pos and self._farthest_from_gen + Vector3.new(0, 17, 0) or monpos[self._monster_step])
                     hrp.AssemblyLinearVelocity = Vector3.zero
 
                 else
-                    hrp.CFrame = CFrame.new(self._farthest_from_gen + Vector3.new(0, 15, 0))
+                    hrp.CFrame = CFrame.new(self._farthest_from_gen + Vector3.new(0, 17, 0))
                     hrp.AssemblyLinearVelocity = Vector3.zero
                 end
             end
