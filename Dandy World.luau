@@ -981,7 +981,7 @@ function PriorityFunctions.AutoPlay()
                         local dist = (v.HumanoidRootPart.Position - hrp.Position).Magnitude
                         local attacking = v:FindFirstChild("Attacking")
 
-                        if attacking and attacking.Value and dist < 20 then
+                        if attacking and attacking.Value and dist < 30 then
                             self._last_long_atk = tick()
                             self._farthest_from_gen = nil
 
