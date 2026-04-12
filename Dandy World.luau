@@ -1215,9 +1215,7 @@ function self.NormalMode()
             self.StopGenerate()
         end
 
-        hrp.CFrame = CFrame.new(prompt.Position - Vector3.new(0, 3, 0))
-        hrp.AssemblyLinearVelocity = Vector3.zero
-
+        self.TPNoDanger(generator.ScrapsAttachPoint.CFrame)
         self.Generate(generator)
 
     elseif geneStats.ActivePlayer.Value == Player.Character then
