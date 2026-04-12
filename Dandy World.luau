@@ -12,7 +12,11 @@ type Setting = {
     AutoClosePopup:         boolean,
     AutoReady:              boolean,
     AutoEscapeSquirm:       boolean,
-    AutoSpeedChange:        boolean,
+    AutoSetSpeed:           boolean,
+    AutoJoin:               boolean,
+    AutoJoinWithPlayer:     boolean,
+    AutoJoinMatchMaking:    boolean,
+    AutoReturnToLobby:      boolean,
     ESPGenerator:           boolean,
     ESPTwisted:             boolean,
     ESPItem:                boolean,
@@ -21,10 +25,12 @@ type Setting = {
     -- Settings
     AutoExecute:            boolean,
     SelectPlayer:           string,
+    SelectSpeed:            number,
+    SelectJoinWithPlayer:   string,
+    JoinMatchMakingDelay:   number,
     TweenSpeed:             number,
     AutoPlayMode:           "Normal" | "Distractor",
     YPos:                   number,
-    SpeedMultiplier:        number,
     TeleportAtDistance:     number,
     Priority:               {Priority: number, Server: string?},
     SortedPriority:         {string},
@@ -33,12 +39,15 @@ type Setting = {
 
 local self = {}
 self.Settings = {} :: Setting
+self.Signal = Instance.new("BindableEvent")
+self.Troves = {}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local AuctusAPI = loadstring(game:HttpGet("https://raw.githubusercontent.com/1makam1/Main/refs/heads/main/AuctusAPI.luau"))()
+local Trove = loadstring(game:HttpGet("https://raw.githubusercontent.com/1makam1/Main/refs/heads/main/Utility/Trove.luau"))()
 
 local GAME = "Dandy World"
 local SCRIPT = `loadstring(game:HttpGet("https://raw.githubusercontent.com/ApexHub-Script/Main/refs/heads/main/{GAME:gsub(" ", "%%20")}.luau"))()`
@@ -353,19 +362,13 @@ function InitFunctions.InitPriority()
     self.SetPriority()
 end
 
-function InitFunctions.InitSaveSetting()
-    Players.PlayerRemoving:Connect(function(plr)
-        if plr == Player then
-            self.SaveSetting()
-        end
-    end)
-end
-
 function InitFunctions.InitAutoExecute()
     local queueteleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
 
     Player.OnTeleport:Connect(function()
-        if not getgenv().ApexHubAutoExecute and self.Settings.AutoExecute and queueteleport then
+        if not self.Settings.AutoExecute then return end
+
+        if not getgenv().ApexHubAutoExecute and queueteleport then
             getgenv().ApexHubAutoExecute = true
             queueteleport(SCRIPT)
         end
@@ -396,6 +399,116 @@ function InitFunctions:ValidateServer()
 
         repeat task.wait(9e9) until false
     end
+end
+
+function InitFunctions.GetRoom()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
+    local CurrentRoom = workspace:WaitForChild("CurrentRoom")
+
+    task.delay(1, function()
+        local room = CurrentRoom:GetChildren()[1]
+
+        if room then
+            self.room = room
+            self.Signal:Fire("RoomAdded")
+        end
+
+        CurrentRoom.ChildAdded:Connect(function(child)
+            self.room = child
+            self.Signal:Fire("RoomAdded")
+        end)
+        CurrentRoom.ChildRemoved:Connect(function()
+            self.room = nil
+            self.Signal:Fire("RoomRemoved")
+        end)
+    end)
+end
+
+function InitFunctions.InitHighlight()
+    local function AddMonConnect(monster: Model)
+        local icon = self.CreateTwistedIcon(monster.Name)
+        local monster_trove = self.Troves.ESPMonster
+
+        if not monster_trove then return end
+
+        monster_trove:Add(icon)
+        monster_trove:Connect(RunService.RenderStepped, function()
+            self.UpdateMonsterIcon(icon)
+        end)
+    end
+
+    local function AddAllMonConnect()
+        local monsters = self.room:WaitForChild("Monsters")
+
+        for _, monster in monsters:GetChildren() do
+            AddMonConnect(monster)
+        end
+
+        monsters.ChildAdded:Connect(AddMonConnect)
+    end
+
+    local function newTrove()
+        if self.Troves.ESPMonster then return end
+
+        self.Troves.ESPMonster = Trove.new()
+    end
+
+    local function ESP(enable: boolean)
+        if not enable then self.ClearTwistedIcon() return end
+        if not self.room then return end
+        if not self.Settings.ESPTwisted then return end
+
+        newTrove()
+        AddAllMonConnect()
+    end
+
+    self.Signal.Event:Connect(function(event: string, ...)
+        if event == "RoomAdded" then
+            ESP(true)
+
+        elseif event == "RoomRemoved" then
+            ESP(false)
+
+        elseif event == "ESPTwisted" then
+            ESP(...)
+        end
+    end)
+end
+
+function InitFunctions.InitNoclip()
+    self.Signal.Event:Connect(function(event: string, ...)
+        if event == "RoomAdded" and self.Settings.AutoNoclip then
+            self.Noclip(true)
+
+        elseif event == "AutoNoclip" then
+            self.Noclip(...)
+        end
+    end)
+end
+
+function InitFunctions.AutoClosePopup()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
+    local ScreenGui = PlayerGui:WaitForChild("ScreenGui")
+
+    ScreenGui.ChildAdded:Connect(function(child)
+        if not self.Settings.AutoClosePopup then return end
+
+        if child.Name == "TemporaryPopUp" then
+            child:Destroy()
+        end
+    end)
+
+    self.Signal.Event:Connect(function(event: string, ...)
+        if event == "AutoClosePopup" and ... == true then
+            for _, v in ScreenGui:GetChildren() do
+                if v.Name == "TemporaryPopUp" then
+                    v:Destroy()
+                end
+            end
+        end
+    end)
 end
 
 -- ═══════════════════════════════════════════════════════════════
@@ -521,9 +634,14 @@ function self.Noclip(noclip: boolean)
     if game.PlaceId ~= SERVERS.InGame then return end
     if not self.room or not self.room.Parent then return end
 
-    local function search(path: Instance, mode: "Exlude" | "Include", filter: {string})
-        if not path then return end
+    local path_infos = {
+        FreeArea =      {"Exclude", {}},
+        SecondFloor =   {"Exclude", {}},
+        Walls =         {"Exclude", {"Collider"}},
+        Generators =    {"Exclude", {"ScrapsAttachPoint", "FakeValve"}}
+    }
 
+    local function search(path: Instance, mode: "Exlude" | "Include", filter: {string})
         local expectType = if mode == "Exclude" then "nil" else "number"
 
         local function check(parts: {Instance})
@@ -545,13 +663,19 @@ function self.Noclip(noclip: boolean)
         end
     end
 
-    -- search(self.room:FindFirstChild("FreeArea"), "Include", {"NoClip_Collider", "NoClip"})
-    -- search(self.room:FindFirstChild("Walls"), "Include", {"NoClip_Collider", "NoClip"})
+    local function CheckPath(path)
+        local path_info = path_infos[path.Name]
 
-    search(self.room:FindFirstChild("FreeArea"), "Exclude", {})
-    search(self.room:FindFirstChild("SecondFloor"), "Exclude", {})
-    search(self.room:FindFirstChild("Walls"), "Exclude", {"Collider"})
-    search(self.room:FindFirstChild("Generators"), "Exclude", {"ScrapsAttachPoint", "FakeValve"})
+        if not path_info then return end
+
+        task.spawn(search, path, unpack(path_info))
+    end
+
+    for _, v in self.room:GetChildren() do
+        CheckPath(v)
+    end
+
+    self.room.ChildAdded:Connect(CheckPath)
 end
 
 function self.ESP(path: Folder, enable: boolean, color: Color3?)
@@ -602,8 +726,8 @@ function self.ESP(path: Folder, enable: boolean, color: Color3?)
     end
 end
 
-function self.Run(run: boolean)
-    if self.Settings.AutoSpeedChange then return end
+function self.Run(enable: boolean)
+    if self.Settings.AutoSetSpeed then return end
 
     local char = Player.Character
     local hum = char and char:FindFirstChild("Humanoid")
@@ -615,7 +739,7 @@ function self.Run(run: boolean)
     local walkspeedmodifier = stats and stats:FindFirstChild("SpeedModifier")
 
     if hum then
-        if run and runspeed and runspeedmodifier then
+        if enable and runspeed and runspeedmodifier then
             hum.WalkSpeed = runspeed.Value * runspeedmodifier.Value
 
         elseif sprinting and not sprinting.Value and walkspeed and walkspeedmodifier then
@@ -657,27 +781,46 @@ function self.FloorActive()
     end
 end
 
-function self.GetAvaliableGenerator(): Model
-    for _, generator in self.room.Generators:GetChildren() do
+function self.GetAvailableGenerator(): Model
+    local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
+
+    local function CheckGenerator(generator: Model)
         local stats = generator:FindFirstChild("Stats")
         local activePlr = stats.ActivePlayer.Value
-        local dangerObjName = {"SproutTendril", "BassieChunk", "BlotHandZone"}
         local dangerous = false
 
-        if stats.Connie.Value then continue end
+        if stats.Connie.Value then return end
 
         local function searchDanger(path: Instance)
             if dangerous then return end
 
+            local safefol = path:FindFirstChild(path.Name .. "Safe")
+
+            if not safefol and path ~= workspace then
+                safefol = Instance.new("Folder", path)
+                safefol.Name = path.Name .. "Safe"
+            end
+
             for _, obj in path:GetChildren() do
+                if obj:IsA("Terrain") or not (obj:IsA("Model") or obj:IsA("BasePart")) then continue end
+
+                local objHrp = obj:FindFirstChild("HumanoidRootPart")
+                local nameMatch
+
                 for _, name in dangerObjName do
-                    local objHrp = obj:FindFirstChild("HumanoidRootPart")
+                    if nameMatch then break end
 
-                    if obj.Name:match(name) and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 30 then
-                        dangerous = true
+                    nameMatch = obj.Name:match(name)
+                end
 
-                        return
-                    end
+                if safefol and not nameMatch then
+                    obj.Parent = safefol
+                end
+
+                if nameMatch and ((objHrp and objHrp.Position or obj:GetPivot().Position) - generator.Prompt.Position).Magnitude < 30 then
+                    dangerous = true
+
+                    return
                 end
             end
         end
@@ -694,13 +837,19 @@ function self.GetAvaliableGenerator(): Model
             end
         end
 
-        searchDanger(self.room.FreeArea)
-        searchDanger(self.room)
-        searchDanger(workspace)
+        task.spawn(searchDanger, self.room.FreeArea)
+        task.spawn(searchDanger ,self.room)
+        task.spawn(searchDanger ,workspace)
 
-        if stats and not stats.Completed.Value and ((not activePlr and not dangerous) or activePlr == Player.Character) then
+        if stats and not stats.Completed.Value and (not activePlr or activePlr == Player.Character) and not dangerous then
             return generator
         end
+    end
+
+    for _, generator in self.room.Generators:GetChildren() do
+        local available = CheckGenerator(generator)
+
+        if available then return available end
     end
 end
 
@@ -719,6 +868,11 @@ function self.Generate(generator)
 end
 
 function self.StopGenerate()
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if hrp and not hrp.Anchored then return end
+
     for _, generator in self.room.Generators:GetChildren() do
         local stats = generator.Stats
 
@@ -735,9 +889,12 @@ function self.TPNoDanger(des)
     if not hrp then return end
 
     for _, obj in self.room.FreeArea:GetChildren() do
-        local objHrp = obj:FindFirstChild("HumanoidRootPart")
+        if obj.Name ~= "SproutTendril" then continue end
 
-        if obj.Name == "SproutTendril" and ((objHrp and objHrp.Position or obj:GetPivot().Position) - des.Position).Magnitude < 20 then
+        local objHrp = obj:FindFirstChild("HumanoidRootPart")
+        local objPos = (objHrp and objHrp.Position or obj:GetPivot().Position)
+
+        if (objPos - des.Position).Magnitude < 30 then
             self.TPNoDanger(des - Vector3.new(0, 15, 0))
 
             return
@@ -775,12 +932,6 @@ function self.CreateTwistedIcon(twisted: string)
 	ScreenGui.IgnoreGuiInset = true
 	ScreenGui.ResetOnSpawn = true
 
-	if not self._TwistedIcon then
-		self._TwistedIcon = {}
-	end
-
-	self._TwistedIcon[twisted] = ScreenGui
-
 	Icon.Name = "Icon"
 	Icon.Parent = ScreenGui
 	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -789,7 +940,20 @@ function self.CreateTwistedIcon(twisted: string)
 	Icon.BorderSizePixel = 0
 	Icon.Position = UDim2.new(-1, 0, -1, 0)
 	Icon.Size = UDim2.new(0, 50, 0, 50)
-	Icon.Image = require(game:GetService("ReplicatedStorage").MonsterData[twisted]).Icon
+
+    task.spawn(function()
+        local moduleScript = twisted ~= "SquirmMonster" and game:GetService("ReplicatedStorage").MonsterData[twisted] or game:GetService("ReplicatedStorage").MonsterModules.TwistedSquirmConfig
+        local success, moduleData = pcall(require, moduleScript)
+        local image = ""
+
+        if not success then
+            image = decompile(moduleScript):match('Icon%s*=%s*"(.-)"')
+        else
+            image = moduleData.Icon or moduleData.STATS.Icon
+        end
+
+        Icon.Image = image
+    end)
 
 	local IconStroke = Instance.new("UIStroke", Icon)
 	IconStroke.Color = Color3.fromRGB(255, 255, 255)
@@ -825,6 +989,8 @@ function self.CreateTwistedIcon(twisted: string)
 	local DistanceStroke = Instance.new("UIStroke", DistanceLabel)
 	DistanceStroke.Color = Color3.fromRGB(0, 0, 0)
 	DistanceStroke.Thickness = 1
+
+    return ScreenGui
 end
 
 function self.DeleteTwistedIcon(twisted: string)
@@ -836,15 +1002,11 @@ function self.DeleteTwistedIcon(twisted: string)
 end
 
 function self.ClearTwistedIcon()
-    if not self._TwistedIcon then
-        self._TwistedIcon = {}
-    end
+    local mon_esp_trove = self.Troves.ESPMonster
 
-	for twisted, icon in self._TwistedIcon do
-		icon:Destroy()
-	end
+    if not mon_esp_trove then return end
 
-	table.clear(self._TwistedIcon)
+    self.Troves.ESPMonster = mon_esp_trove:Clean()
 end
 
 function self.getFarthestPair(points: {Vector3})
@@ -861,168 +1023,336 @@ function self.getFarthestPair(points: {Vector3})
 	return maxDist
 end
 
+function self.UpdateMonsterIcon(icon: ScreenGui)
+    if not self.room then return end
+
+    local camera = workspace.CurrentCamera
+	local char = Player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local monsters = self.room:FindFirstChild("Monsters")
+
+	if not hrp then return end
+
+	local padding = 30
+	local currentPos = Vector2.new(0, 0)
+    local guide = icon:FindFirstChild("Icon")
+    local line = icon:FindFirstChild("Line")
+    local label = icon:FindFirstChild("DistanceLabel")
+
+    if not guide or not line or not label then return end
+
+    local target = monsters and monsters:FindFirstChild(icon.Name)
+    local targethrp = target and (target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart"))
+
+    if not targethrp then return end
+
+    local targetpos = targethrp.Position
+    local viewportSize = camera.ViewportSize
+    local screenPos, onScreen = camera:WorldToViewportPoint(targetpos)
+
+    local targetPos2D = Vector2.new(screenPos.X, screenPos.Y)
+
+    -- Detect behind camera
+    local isBehind = screenPos.Z < 0
+
+    -- Clamp to screen edges if off-screen or behind
+    if not onScreen or isBehind then
+        local center = viewportSize / 2
+        local dir = targetPos2D - center
+
+        if isBehind then
+            dir = -dir
+        end
+
+        dir = dir.Unit
+
+        -- account for GUI size so it doesn't clip
+        local halfGui = guide.AbsoluteSize / 2
+
+        local limitX = (viewportSize.X / 2) - padding - halfGui.X
+        local limitY = (viewportSize.Y / 2) - padding - halfGui.Y
+
+        local scaleX = limitX / math.abs(dir.X)
+        local scaleY = limitY / math.abs(dir.Y)
+
+        local scale = math.min(scaleX, scaleY)
+
+        targetPos2D = center + dir * scale
+    end
+
+    -- LERP movement (smooth)
+    currentPos = targetPos2D
+
+    guide.Position = UDim2.fromOffset(currentPos.X, currentPos.Y)
+
+    -- === LINE LOGIC ===
+    local center = viewportSize / 2
+    local dir = targetPos2D - center
+    local length = dir.Magnitude
+
+    -- position line at midpoint
+    line.Position = UDim2.fromOffset(
+        center.X + dir.X / 2,
+        center.Y + dir.Y / 2
+    )
+
+    -- set length (width) and thickness
+    line.Size = UDim2.fromOffset(length, 2)
+
+    -- rotate line
+    line.Rotation = math.deg(math.atan2(dir.Y, dir.X))
+
+    -- === DISTANCE LABEL ===
+    label.Position = UDim2.fromOffset(
+        center.X + dir.X / 2,
+        center.Y + dir.Y / 2
+    )
+
+    -- world distance (3D, not screen distance)
+    local worldDistance = (hrp.Position - targetpos).Magnitude
+
+    label.Text = string.format("%.0f Studs", worldDistance)
+
+    -- color change
+    local GB_value = math.min(worldDistance, 255)*4.5
+    local color = Color3.fromRGB(255, GB_value, GB_value)
+    guide.UIStroke.Color = color
+    line.BackgroundColor3 = color
+    label.TextColor3 = color
+end
+
+function self.GetClosetElevator(host: BasePart)
+    local closet_ele
+    local closet_distance = 40
+
+    for _, elevator in workspace.Elevators:GetChildren() do
+        local dis = (elevator.spawn.Position - host.Position).Magnitude
+
+        if dis < closet_distance then
+            closet_ele = elevator
+        end
+    end
+
+    return closet_ele
+end
+
+function self.GetFarthestComplatedGenerator(): Model?
+    local farthest_gen
+    local farthest_distance
+
+    for _, v in self.room.Generators:GetChildren() do
+        if v.Stats.Completed.Value then
+            local distance = (v.Prompt.Position - workspace.Elevators.Elevator.Base.Position).Magnitude
+
+            if not farthest_distance or distance > farthest_distance then
+                farthest_distance = distance
+                farthest_gen = v
+            end
+        end
+    end
+
+    return farthest_gen
+end
+
+function self.DistractorGenCountCheck()
+    local info = workspace.Info
+    local gen_count = info.GeneratorsCompleted.Value
+
+    if self._last_gen_count ~= gen_count then
+        self._last_gen_count = gen_count
+        self._last_gen_count_change = tick()
+    end
+
+    if self._last_gen_count_change and tick() - self._last_gen_count_change > 60 then
+        self._last_gen_count_change = tick()
+
+        local farthest_completed_gen = self.GetFarthestComplatedGenerator()
+
+        if farthest_completed_gen then
+            local gen_pos = farthest_completed_gen.ScrapsAttachPoint.CFrame
+            self._farthest_from_gen = gen_pos.Position - gen_pos.LookVector * 3
+        end
+    end
+end
+
+function self.NormalMode()
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster", "ConnieMonster", "SquirmMonster"}
+
+    if not hrp then return end
+
+    local generator = self.GetAvailableGenerator()
+    local spotted = self.IsChased()
+    local geneStats = generator and generator:FindFirstChild("Stats")
+
+    if self._distractor_start_pos then
+        self._distractor_start_pos = nil
+        self._farthest_from_gen = nil
+    end
+
+    if not geneStats then
+        self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 20, 0)))
+
+        return
+    end
+
+    local prompt = generator.Prompt
+    local closetmon = self.GetClosetMon(prompt)
+    local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
+    local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and (monhrp.Position - prompt.Position).Magnitude < 20
+
+    if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
+        if spotted then
+            self._last_spotted = tick()
+        end
+
+        self.StopGenerate()
+        self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, 15, 0)))
+
+    elseif geneStats.ActivePlayer.Value ~= Player.Character then
+        if hrp.Anchored then
+            self.StopGenerate()
+        end
+
+        hrp.CFrame = generator.ScrapsAttachPoint.CFrame
+        hrp.AssemblyLinearVelocity = Vector3.zero
+
+        self.Generate(generator)
+
+    elseif geneStats.ActivePlayer.Value == Player.Character then
+        hrp.CFrame = generator.ScrapsAttachPoint.CFrame
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
+function self.DistractorMode()
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster", "ConnieMonster", "SquirmMonster"}
+
+    if not hrp then return end
+    if not self.room:FindFirstChild("Monsters") then return end
+    if not self.room:FindFirstChild("FreeArea") then return end
+
+    self.DistractorGenCountCheck()
+
+    if not self._distractor_start_pos then
+        self._distractor_start_pos = hrp.CFrame
+    end
+
+    if not self._farthest_from_gen then
+        for _, v in self.room.Monsters:GetChildren() do
+            if table.find(no_offense, v.Name) then continue end
+
+            for _, gen in self.room.Generators:GetChildren() do
+                local old_ds = self._farthest_from_gen and (self._farthest_from_gen - gen.Prompt.Position).Magnitude
+                local pos = v.HumanoidRootPart.Position
+                local ds = (pos - gen.Prompt.Position).Magnitude
+
+                if not old_ds or ds > old_ds then
+                    self._farthest_from_gen = pos
+                end
+            end
+        end
+    end
+
+    if not self._farthest_from_gen then
+        self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 20, 0)))
+
+        return
+    end
+
+    local monpos = {}
+
+    for _, v in self.room.Monsters:GetChildren() do
+        if table.find(no_offense, v.Name) then continue end
+        if v.Name == "GlistenMonster" and not v:GetAttribute("GlistenActivated") then continue end
+
+        if v:FindFirstChild("Grabbing") and v.Grabbing.Value then
+            self._last_long_atk = tick()
+
+            break
+        end
+
+        table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 15, 0))
+    end
+
+    for _, v in self.room.FreeArea:GetChildren() do
+        if v.Name == "SproutTendril" then
+            local objHrp = v:FindFirstChild("HumanoidRootPart")
+            local objPos = (objHrp and objHrp.Position or v:GetPivot().Position)
+            local dist = (objPos - hrp.Position).Magnitude
+            local attacking = v:FindFirstChild("Attacking")
+
+            if attacking and attacking.Value and dist < 30 then
+                self._last_long_atk = tick()
+
+                break
+            end
+        end
+    end
+
+    if tick() - (self._last_long_atk or 0) < 2 then
+        self.TPNoDanger(CFrame.new(self._farthest_from_gen + Vector3.new(0, 200, 0)))
+
+        return
+    end
+
+    local s = self.getFarthestPair(monpos)
+
+    if s > 20 then
+        if not self._monster_step then self._monster_step = 0 end
+
+        if not self._last_mon_step or tick() - self._last_mon_step > (self._on_farthest_pos and 0.5 or 0.2) then
+            self._last_mon_step = tick()
+            self._monster_step += 1
+
+            if self._on_farthest_pos then
+                self._on_farthest_pos = false
+                self._monster_step = 1
+            end
+        end
+
+        if self._monster_step > #monpos then
+            self._on_farthest_pos = true
+        end
+
+        hrp.CFrame = CFrame.new(self._on_farthest_pos and self._farthest_from_gen + Vector3.new(0, 20, 0) or monpos[self._monster_step])
+        hrp.AssemblyLinearVelocity = Vector3.zero
+
+    else
+        hrp.CFrame = CFrame.new(self._farthest_from_gen + Vector3.new(0, 20, 0))
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
 -- ═══════════════════════════════════════════════════════════════
 --  ⭐ PRIORITY FUNCTIONS ⭐
 -- ═══════════════════════════════════════════════════════════════
 local PriorityFunctions = {}
 function PriorityFunctions.AutoPlay()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
     self.PriorityFarming = true
 
     local char = Player.Character
     local stats = char and char:FindFirstChild("Stats")
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChild("Humanoid")
+    local game_info = workspace.Info
 
-    local no_offense = {"RazzleDazzleMonster", "RodgerMonster", "BlottMonster", "ConnieMonster", "SquirmMonster"}
+    if self.FloorActive() then
+        if not self.room then return end
 
-    if game.PlaceId == SERVERS.InGame then -- in game
-        if self.FloorActive() then
-            if self.Settings.AutoPlayMode == "Normal" then -- normal mode
-                local generator = self.GetAvaliableGenerator()
-                local spotted = self.IsChased()
-                local geneStats = generator and generator:FindFirstChild("Stats")
+        if self.Settings.AutoPlayMode == "Normal" then -- normal mode
+            self.NormalMode()
 
-                if self._distractor_start_pos then
-                    self._distractor_start_pos = nil
-                    self._farthest_from_gen = nil
-                end
+        elseif self.Settings.AutoPlayMode == "Distractor" then -- distractor mode
+            self.DistractorMode()
+        end
 
-                if not generator or not geneStats then
-                    self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 20, 0)))
-
-                    return
-                end
-
-                local prompt = generator.Prompt
-                local closetmon = self.GetClosetMon(prompt)
-                local monhrp = closetmon and closetmon:FindFirstChild("HumanoidRootPart")
-                local ChasingValue = closetmon and closetmon:FindFirstChild("ChasingValue")
-                local is_mon_close = not table.find(no_offense, closetmon.Name) and monhrp and ChasingValue and (monhrp.Position - prompt.Position).Magnitude < 15
-
-                if spotted or tick() - (self._last_spotted or 0) < 5 or is_mon_close then
-                    if geneStats.ActivePlayer.Value == Player.Character then
-                        self.StopGenerate()
-                    end
-
-                    if spotted then
-                        self._last_spotted = tick()
-                    end
-
-                    self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, 15, 0)))
-
-                elseif geneStats.ActivePlayer.Value ~= Player.Character and not hrp.Anchored then
-                    self.TPNoDanger(CFrame.new(prompt.Position - Vector3.new(0, hum.HipHeight+0.2, 0)))
-                    self.Generate(generator)
-
-                elseif geneStats.ActivePlayer.Value == Player.Character then
-                    self.TPNoDanger(generator.ScrapsAttachPoint.CFrame)
-                end
-
-            elseif self.Settings.AutoPlayMode == "Distractor" then -- distractor mode
-
-                local info = workspace.Info
-                local gen_c = info.GeneratorsCompleted.Value
-
-                if self._last_gen_c ~= gen_c then
-                    self._last_gen_c = gen_c
-                    self._last_gen_c_change = tick()
-                end
-
-                if self._last_gen_c_change and tick() - self._last_gen_c_change > 30 then
-                    self._last_gen_c_change = tick()
-                    self._farthest_from_gen = nil
-
-                    for _, v in self.room.Generators:GetChildren() do
-                        if v.Stats.Completed.Value then
-                            local gen_pos = v.ScrapsAttachPoint.CFrame
-
-                            self._farthest_from_gen = gen_pos.Position - gen_pos.LookVector * 3
-
-                            break
-                        end
-                    end
-                end
-
-                if not self._distractor_start_pos then
-                    self._distractor_start_pos = hrp.CFrame
-                end
-
-                if not self._farthest_from_gen then
-                    for _, v in self.room.Monsters:GetChildren() do
-                        if table.find(no_offense, v.Name) then continue end
-
-                        for _, gen in self.room.Generators:GetChildren() do
-                            local old_ds = self._farthest_from_gen and (self._farthest_from_gen - gen.Prompt.Position).Magnitude
-                            local ds = (v.HumanoidRootPart.Position - gen.Prompt.Position).Magnitude
-
-                            if not old_ds or ds > old_ds then
-                                self._farthest_from_gen = v.HumanoidRootPart.Position
-                            end
-                        end
-                    end
-                end
-
-                local monpos = {}
-
-                for _, v in self.room.Monsters:GetChildren() do
-                    if table.find(no_offense, v.Name) then continue end
-
-                    if v:FindFirstChild("Grabbing") and v.Grabbing.Value then
-                        self._last_long_atk = tick()
-
-                        break
-                    end
-
-                    table.insert(monpos, v.HumanoidRootPart.Position + Vector3.new(0, 15, 0))
-                end
-
-                for _, v in self.room.FreeArea:GetChildren() do
-                    if v.Name == "SproutTendril" then
-                        local dist = (v.HumanoidRootPart.Position - hrp.Position).Magnitude
-                        local attacking = v:FindFirstChild("Attacking")
-
-                        if attacking and attacking.Value and dist < 30 then
-                            self._last_long_atk = tick()
-                            self._farthest_from_gen = nil
-
-                            break
-                        end
-                    end
-                end
-
-                if tick() - (self._last_long_atk or 0) < 2 then
-                    self.TPNoDanger(CFrame.new(workspace.Elevators.Elevator.Base.Position - Vector3.new(0, 20, 0)))
-
-                    return
-                end
-
-                local s = self.getFarthestPair(monpos)
-
-                if s > 20 then
-                    if not self._monster_step then self._monster_step = 0 end
-
-                    if not self._last_mon_step or tick() - self._last_mon_step > (self._on_farthest_pos and 0.3 or 0.1) then
-                        self._last_mon_step = tick()
-                        self._monster_step += 1
-
-                        if self._on_farthest_pos then
-                            self._on_farthest_pos = false
-                            self._monster_step = 1
-                        end
-                    end
-
-                    if self._monster_step > #monpos then
-                        self._on_farthest_pos = true
-                    end
-
-                    hrp.CFrame = CFrame.new(self._on_farthest_pos and self._farthest_from_gen + Vector3.new(0, 17, 0) or monpos[self._monster_step])
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-
-                else
-                    hrp.CFrame = CFrame.new(self._farthest_from_gen + Vector3.new(0, 17, 0))
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                end
-            end
+    else
+        if self.Settings.AutoPlayMode == "Distractor" and self.room and game_info.Panic.Value and (game_info.PanicTimer.Value > 1 and game_info.PlayersInElevator.Value < game_info.ActivePlayers.Value-1) then
+            self.DistractorMode()
 
         elseif stats and not stats.InElevator.Value then
             self.TPElevater()
@@ -1032,28 +1362,6 @@ function PriorityFunctions.AutoPlay()
                 self._distractor_start_pos = nil
             end
         end
-
-    elseif game.PlaceId == SERVERS.Lobby then -- lobby
-        for _, gate in workspace.Elevators:GetChildren() do
-            if self._joing then break end
-
-            local avaliable = gate.GuiPart.SurfaceGui.Frame.players.Text:sub(1,1)
-
-            if avaliable == "0" then
-                self._joing = true
-
-                firetouchinterest(gate.Gate, hrp, true)
-                task.wait(0.1)
-                firetouchinterest(gate.Gate, hrp, false)
-                task.wait(0.1)
-
-                return
-            end
-        end
-
-        if PlayerGui.MainGui.fillParty.TextMargin.TextLabelVotes.Text:sub(2,2) == "0" then
-            game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer("VoteMatch")
-        end
     end
 end
 
@@ -1061,18 +1369,6 @@ end
 --  🤖 AUTOMATION FUNCTIONS 🤖
 -- ═══════════════════════════════════════════════════════════════
 local AutomationFunctions = {}
-function AutomationFunctions.SaveSetting()
-    if not self.LastSave then
-        self.LastSave = 0
-    end
-
-    if tick() - self.LastSave < 2 then return end
-
-    self.LastSave = tick()
-
-    self.SaveSetting()
-end
-
 function AutomationFunctions.AutoSkillCheck()
     if game.PlaceId ~= SERVERS.InGame then return end
 
@@ -1116,16 +1412,6 @@ function AutomationFunctions.AutoSkillCheck()
     end
 end
 
-function AutomationFunctions.Noclip()
-    self.Noclip(self.Settings.AutoNoclip)
-end
-
-function AutomationFunctions.GetRoom()
-    if game.PlaceId ~= SERVERS.InGame then return end
-
-    self.room = workspace.CurrentRoom:GetChildren()[1]
-end
-
 function AutomationFunctions.ESP()
     if game.PlaceId ~= SERVERS.InGame then return end
     if not self.room or not self.room.Parent then return end
@@ -1140,40 +1426,27 @@ function AutomationFunctions.AutoRun()
     self.Run(true)
 end
 
-function AutomationFunctions.AutoSpeedChange()
+function AutomationFunctions.AutoSetSpeed()
     if game.PlaceId ~= SERVERS.InGame then return end
 
     local char = Player.Character
     local humanoid = char and char:FindFirstChild("Humanoid")
-    local stats = char and char:FindFirstChild("Stats")
-    local runspeed = stats and stats:FindFirstChild("RunSpeed")
-    local sprinting = stats and stats:FindFirstChild("Sprinting")
-    local walkspeed = stats and stats:FindFirstChild("WalkSpeed")
-    local runspeedmodifier = stats and stats:FindFirstChild("RunSpeedModifier")
-    local walkspeedmodifier = stats and stats:FindFirstChild("SpeedModifier")
 
-    if humanoid and sprinting then
-        if sprinting.Value and runspeed and runspeedmodifier then
-            humanoid.WalkSpeed = (runspeed.Value * runspeedmodifier.Value) * self.Settings.SpeedMultiplier
+    if not humanoid then return end
 
-        elseif not sprinting.Value and walkspeed and walkspeedmodifier then
-            humanoid.WalkSpeed = (walkspeed.Value * walkspeedmodifier.Value) * self.Settings.SpeedMultiplier
-        end
+    if not self.Settings.SelectSpeed then
+        local stats = char and char:FindFirstChild("Stats")
+        local runspeed = stats and stats:FindFirstChild("RunSpeed")
+
+        humanoid.WalkSpeed = runspeed.Value
+
+    else
+        humanoid.WalkSpeed = self.Settings.SelectSpeed
     end
 end
 
 function AutomationFunctions.FullBright()
     self.FullBright(self.Settings.AutoFullBright)
-end
-
-function AutomationFunctions.AutoClosePopup()
-    if game.PlaceId ~= SERVERS.InGame then return end
-
-    local popuup = PlayerGui.ScreenGui:FindFirstChild("TemporaryPopUp")
-
-    if popuup then
-        popuup:Destroy()
-    end
 end
 
 function AutomationFunctions.AutoReady()
@@ -1187,123 +1460,9 @@ function AutomationFunctions.AutoReady()
     end
 end
 
-function AutomationFunctions.UpdateTwistedIcon()
-	if not self.room then self.ClearTwistedIcon() return end
-    if not self.Settings.ESPTwisted then return end
-
-	local camera = workspace.CurrentCamera
-	local char = Player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local monsters = self.room:FindFirstChild("Monsters")
-
-	if not hrp then return end
-
-	local padding = 30
-	local currentPos = Vector2.new(0, 0)
-
-    if not self._TwistedIcon then
-        self._TwistedIcon = {}
-    end
-
-	for twisted, icon in self._TwistedIcon do
-		local guide = icon.Icon
-		local line = icon.Line
-		local label = icon.DistanceLabel
-
-		local target = monsters and monsters:FindFirstChild(twisted)
-        local targethrp = target and (target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart"))
-
-		if not targethrp then
-			self.DeleteTwistedIcon(twisted)
-
-			continue
-		end
-
-        local targetpos = targethrp.Position
-		local viewportSize = camera.ViewportSize
-		local screenPos, onScreen = camera:WorldToViewportPoint(targetpos)
-
-		local targetPos2D = Vector2.new(screenPos.X, screenPos.Y)
-
-		-- Detect behind camera
-		local isBehind = screenPos.Z < 0
-
-		-- Clamp to screen edges if off-screen or behind
-		if not onScreen or isBehind then
-			local center = viewportSize / 2
-			local dir = targetPos2D - center
-
-			if isBehind then
-				dir = -dir
-			end
-
-			dir = dir.Unit
-
-			-- account for GUI size so it doesn't clip
-			local halfGui = guide.AbsoluteSize / 2
-
-			local limitX = (viewportSize.X / 2) - padding - halfGui.X
-			local limitY = (viewportSize.Y / 2) - padding - halfGui.Y
-
-			local scaleX = limitX / math.abs(dir.X)
-			local scaleY = limitY / math.abs(dir.Y)
-
-			local scale = math.min(scaleX, scaleY)
-
-			targetPos2D = center + dir * scale
-		end
-
-		-- LERP movement (smooth)
-		currentPos = targetPos2D
-
-		guide.Position = UDim2.fromOffset(currentPos.X, currentPos.Y)
-
-		-- === LINE LOGIC ===
-		local center = viewportSize / 2
-		local dir = targetPos2D - center
-		local length = dir.Magnitude
-
-		-- position line at midpoint
-		line.Position = UDim2.fromOffset(
-			center.X + dir.X / 2,
-			center.Y + dir.Y / 2
-		)
-
-		-- set length (width) and thickness
-		line.Size = UDim2.fromOffset(length, 2)
-
-		-- rotate line
-		line.Rotation = math.deg(math.atan2(dir.Y, dir.X))
-
-		-- === DISTANCE LABEL ===
-		label.Position = UDim2.fromOffset(
-			center.X + dir.X / 2,
-			center.Y + dir.Y / 2
-		)
-
-		-- world distance (3D, not screen distance)
-		local worldDistance = (hrp.Position - targetpos).Magnitude
-
-		label.Text = string.format("%.0f Studs", worldDistance)
-
-		-- color change
-		local GB_value = math.min(worldDistance, 255)*4.5
-		local color = Color3.fromRGB(255, GB_value, GB_value)
-		guide.UIStroke.Color = color
-		line.BackgroundColor3 = color
-		label.TextColor3 = color
-	end
-
-    if not monsters then return end
-
-	for _, monster in self.room.Monsters:GetChildren() do
-		if not self._TwistedIcon[monster.Name] then
-			self.CreateTwistedIcon(monster.Name)
-		end
-	end
-end
-
 function AutomationFunctions.AutoEscapeSquirm()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
     local squirmGui = PlayerGui:FindFirstChild("TwistedSquirmEscapeUI")
 
     if squirmGui and squirmGui.Enabled then
@@ -1318,6 +1477,97 @@ function AutomationFunctions.AutoEscapeSquirm()
                 AuctusAPI:SendKey(Enum.KeyCode.A)
             end
         end
+    end
+end
+
+function AutomationFunctions.AutoJoin()
+    if game.PlaceId ~= SERVERS.Lobby then return end
+
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local partyGui = PlayerGui.MainGui.fillParty
+
+    if not hrp then return end
+
+    if self.Settings.SelectJoinWithPlayer and self.Settings.AutoJoinWithPlayer then
+        local target_char = workspace.Players:FindFirstChild(self.Settings.SelectJoinWithPlayer)
+        local target_hrp = target_char and target_char:FindFirstChild("HumanoidRootPart")
+
+        if target_hrp and hrp then
+            local closet_elevator = self.GetClosetElevator(target_hrp)
+
+            if not closet_elevator then return end
+
+            local origin = closet_elevator.spawn.Position + Vector3.new(0, 3, 0)
+            local dir = target_hrp.Position - origin
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {closet_elevator.Elevator, target_char}
+            params.FilterType = Enum.RaycastFilterType.Include
+
+            local rayresult = workspace:Raycast(origin, dir, params)
+            local dis = (hrp.Position - target_hrp.Position).Magnitude
+
+            if rayresult and rayresult.Instance and rayresult.Instance:IsDescendantOf(target_char) and (dis > 50 or not partyGui.Visible) then
+                local gatepos = closet_elevator.Gate.CFrame
+
+                firetouchinterest(closet_elevator.Gate, hrp, 0)
+                task.delay(0.1, firetouchinterest, closet_elevator.Gate, hrp, 0)
+
+                closet_elevator.Gate.CFrame = gatepos
+            end
+        end
+
+    else
+        if partyGui.Visible then return end
+
+        for _, gate in workspace.Elevators:GetChildren() do
+            local available = gate.GuiPart.SurfaceGui.Frame.players.Text:sub(1,1)
+
+            if available == "0" then
+                local gatepos = gate.Gate.CFrame
+
+                firetouchinterest(gate.Gate, hrp, 0)
+                task.delay(0.1, firetouchinterest, gate.Gate, hrp, 0)
+
+                gate.Gate.CFrame = gatepos
+
+                return
+            end
+        end
+    end
+end
+
+function AutomationFunctions.AutoJoinMatchMaking()
+    if game.PlaceId ~= SERVERS.Lobby then return end
+
+    local partyGui = PlayerGui.MainGui.fillParty
+
+    if partyGui.Visible then
+        if not self._join_room_tick then
+            self._join_room_tick = tick()
+        end
+
+    else
+        self._join_room_tick = nil
+    end
+
+    if self._join_room_tick and tick() - self._join_room_tick > (self.Settings.JoinMatchMakingDelay or 0) then
+        game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer("VoteMatch")
+
+        self._join_room_tick = nil
+    end
+end
+
+function AutomationFunctions.AutoReturnToLobby()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
+    local spectatorGui = PlayerGui:WaitForChild("SpectatorGui")
+    local deathGui = PlayerGui:WaitForChild("DeathGui"):WaitForChild("DeathScreen")
+
+    if not spectatorGui.Enabled and not deathGui.Visible then return end
+
+    if not self._last_teleport_request or tick() - self._last_teleport_request > 1 then
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Teleport"):FireServer()
     end
 end
 
@@ -1341,12 +1591,13 @@ do
             Cassade:Form("AutoFarmSettings", "Automation", {Title = "Auto Farm Settings"})
             Cassade:Form("AutoFarm", "Automation", {Title = "Farm"})
 
-        -- Cassade:Tab("PlayerTab", "MainSection", {Title = "Players", Icon = "rbxassetid://16781409545"})
-        --     Cassade:Form("PlayersForm", "PlayerTab", {Title = "Players"})
-        --     Cassade:Form("PlayerActions", "PlayerTab", {Title = "Actions"})
+        Cassade:Tab("AutoJoin", "MainSection", {Title = "Auto Join", Icon = Cassade.cassade.Symbols.doorLeftHandOpen})
+            Cassade:Form("LobbyForm", "AutoJoin", {Title = "Lobby"})
+            Cassade:Form("InGameForm", "AutoJoin", {Title = "In Game"})
 
-        Cassade:Tab("Player", "MainSection", {Title = "Local Player", Icon = Cassade.cassade.Symbols.house})
-            Cassade:Form("PlayerSpeed", "Player", {Title = "Player Speed"})
+        Cassade:Tab("LocalPlayer", "MainSection", {Title = "Local Player", Icon = Cassade.cassade.Symbols.person})
+            Cassade:Form("PlayerSpeed", "LocalPlayer", {Title = "Player Speed"})
+            Cassade:Form("AbilityForm", "LocalPlayer", {Title = "Ability"})
 
         Cassade:Tab("Visual", "MainSection", {Title = "Visual", Icon = Cassade.cassade.Symbols.eye})
             Cassade:Form("ESP", "Visual", {Title = "ESP"})
@@ -1359,7 +1610,6 @@ do
 
         Cassade:Tab("SettingTab", "SettingsSection", {Title = "Settings", Icon = Cassade.cassade.Symbols.gearshape})
             Cassade:Form("ScriptSettings", "SettingTab", {Title = "Script"})
-        --     Cassade:Form("TweenForm", "SettingTab", {Title = "Tween Settings"})
 
         Cassade:CreateSetting("SettingsSection")
 
@@ -1374,6 +1624,7 @@ do
                     Value = self.Settings.AutoPlayMode == "Distractor" and 2 or 1,
                     ValueChanged = function(_self, value: number)
                         self.Settings.AutoPlayMode = _self.Options[value]
+                        self.SaveSetting()
                     end,
                 })
             end
@@ -1387,6 +1638,7 @@ do
                     Value = self.Settings.AutoPlay or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoPlay = value
+                        self.SaveSetting()
 
                         if not value and self._distractor_start_pos then
                             local char = Player.Character
@@ -1404,17 +1656,6 @@ do
                 })
             end
 
-            do -- Auto Ready
-                local row = Cassade:Row("AutoReadyRow", "AutoFarm", "Auto Ready")
-
-                row:Right():Toggle({
-                    Value = self.Settings.AutoReady or false,
-                    ValueChanged = function(_self, value: boolean)
-                        self.Settings.AutoReady = value
-                    end
-                })
-            end
-
             do -- Auto Skill Check
                 local row = Cassade:Row("AutoSkillCheckRow", "AutoFarm", "Auto Skill Check")
 
@@ -1422,17 +1663,7 @@ do
                     Value = self.Settings.AutoSkillCheck or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoSkillCheck = value
-                    end
-                })
-            end
-
-            do -- noclip
-                local row = Cassade:Row("NoclipRow", "AutoFarm", "Noclip")
-
-                row:Right():Toggle({
-                    Value = self.Settings.AutoNoclip or false,
-                    ValueChanged = function(_self, value: boolean)
-                        self.Settings.AutoNoclip = value
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1444,6 +1675,8 @@ do
                     Value = self.Settings.AutoClosePopup or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoClosePopup = value
+                        self.Signal:Fire("AutoClosePopup", value)
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1455,6 +1688,7 @@ do
                     Value = self.Settings.AutoEscapeSquirm or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoEscapeSquirm = value
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1462,28 +1696,111 @@ do
 
     end
 
-    do -- Visual tab
-        do -- Player Speed Form
-            do -- select speed
-                local row = Cassade:Row("SpeedRow", "PlayerSpeed", "Speed Multiplier")
-                local lb = row:Right():Label({Text = string.format("%.1fx", self.Settings.SpeedMultiplier or 1)})
+    do -- Auto Join tab
 
-                row:Right():Slider({
-                    Value = self.Settings.SpeedMultiplier and self.Settings.SpeedMultiplier * 2 / 10 or 1,
-                    ValueChanged = function(_self, value: number)
-                        self.Settings.SpeedMultiplier = 10 * value / 2
-                        lb.Text = string.format("%.1fx", self.Settings.SpeedMultiplier)
-                    end,
+        do -- Lobby Form
+            do -- Auto Join
+                local row = Cassade:Row("AutoJoinRow", "LobbyForm", "Auto Join")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoJoin or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoJoin = value
+                        self.SaveSetting()
+                    end
                 })
             end
 
-            do -- Auto change speed
-                local row = Cassade:Row("AutoSpeedChangeRow", "PlayerSpeed", "Change Speed")
+            do -- Auto Join With Player
+                local row = Cassade:Row("AutoJoinWithPlayerRow", "LobbyForm", "Join With Player")
+
+                row:Right():TextField({
+                    Placeholder = "Player ...",
+                    Value = self.Settings.SelectJoinWithPlayer or "",
+                    TextChanged = function(_self, value: string)
+                        self.Settings.SelectJoinWithPlayer = value
+                        self.SaveSetting()
+                    end,
+                })
 
                 row:Right():Toggle({
-                    Value = self.Settings.AutoSpeedChange or false,
+                    Value = self.Settings.AutoJoinWithPlayer or false,
                     ValueChanged = function(_self, value: boolean)
-                        self.Settings.AutoSpeedChange = value
+                        self.Settings.AutoJoinWithPlayer = value
+                        self.SaveSetting()
+                    end
+                })
+            end
+
+            do -- Auto Join Match Making
+                local row = Cassade:Row("AutoJoinMatchMakingRow", "LobbyForm", "Join Matchmaking")
+
+                row:Right():TextField({
+                    Placeholder = "Delay ...",
+                    Value = self.Settings.JoinMatchMakingDelay or "",
+                    TextChanged = function(_self, value: string)
+                        self.Settings.JoinMatchMakingDelay = tonumber(value)
+                        self.SaveSetting()
+                    end,
+                })
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoJoinMatchMaking or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoJoinMatchMaking = value
+                        self.SaveSetting()
+                    end
+                })
+            end
+        end
+
+        do -- In Game Form
+            do -- Auto Ready
+                local row = Cassade:Row("AutoReadyRow", "InGameForm", "Auto Ready")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoReady or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoReady = value
+                        self.SaveSetting()
+                    end
+                })
+            end
+
+            do -- Auto Return To Lobby
+                local row = Cassade:Row("AutoReturnToLobbyRow", "InGameForm", "Auto Return To Lobby")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoReturnToLobby or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoReturnToLobby = value
+                        self.SaveSetting()
+                    end
+                })
+            end
+        end
+
+    end
+
+    do -- Local Player tab
+        do -- Player Speed Form
+            do -- Auto Set speed
+                local row = Cassade:Row("AutoSetSpeedRow", "PlayerSpeed", "Set Speed")
+
+                row:Right():TextField({
+                    Placeholder = "Speed ...",
+                    Value = self.Settings.SelectSpeed or "",
+                    TextChanged = function(_self, value: string)
+                        self.Settings.SelectSpeed = tonumber(value)
+                        self.SaveSetting()
+                    end,
+                })
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoSetSpeed or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoSetSpeed = value
+                        self.SaveSetting()
 
                         if not value then
                             self.Run(false)
@@ -1499,10 +1816,26 @@ do
                     Value = self.Settings.AutoRun or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoRun = value
+                        self.SaveSetting()
 
                         if not value then
                             self.Run(false)
                         end
+                    end
+                })
+            end
+        end
+
+        do -- Ability Form
+            do -- noclip
+                local row = Cassade:Row("NoclipRow", "AbilityForm", "Noclip")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoNoclip or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoNoclip = value
+                        self.Signal:Fire("AutoNoclip", value)
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1518,6 +1851,7 @@ do
                     Value = self.Settings.ESPGenerator or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.ESPGenerator = value
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1529,12 +1863,12 @@ do
                     Value = self.Settings.ESPTwisted or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.ESPTwisted = value
-
-                        if not value then
-                            self.ClearTwistedIcon()
-                        end
+                        self.Signal:Fire("ESPTwisted", value)
+                        self.SaveSetting()
                     end
                 })
+
+                --self.IconSignl:Fire(self.Settings.ESPTwisted)
             end
 
             do -- ESP item
@@ -1544,6 +1878,7 @@ do
                     Value = self.Settings.ESPItem or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.ESPItem = value
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1555,6 +1890,7 @@ do
                     Value = self.Settings.ESPToon or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.ESPToon = value
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1568,44 +1904,12 @@ do
                     Value = self.Settings.AutoFullBright or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoFullBright = value
+                        self.SaveSetting()
                     end
                 })
             end
         end
     end
-
-    -- do -- Player tab
-    --     do -- Players Form
-    --         local row = Cassade:Row("SelectPlayerRow", "PlayersForm", "Select Player")
-    --         local popUpButton = row:Right():PopUpButton({
-    --             Options = {self.Settings.SelectPlayer},
-    --             Value = 1,
-    --             ValueChanged = function(_self, value: number)
-    --                 self.Settings.SelectPlayer = _self.Options[value]
-    --             end,
-    --         })
-
-    --         table.insert(self.PlayerDropdown, {Dropdown = popUpButton, SelectVar = "SelectPlayer"})
-    --         self.UpdatePlayerDropdowns()
-    --     end
-
-    --     do -- Actions Form
-    --         do -- fly to player
-    --             local row = Cassade:Row("FlyToPlayerRow", "PlayerActions", "Fly To Player", "fly to selected player.")
-
-    --             row:Right():Toggle({
-    --                 Value = self.Settings.FlyToPlayer or false,
-    --                 ValueChanged = function(_self, value: boolean)
-    --                     self.Settings.FlyToPlayer = value
-
-    --                     if not value then
-    --                         self.Fly()
-    --                     end
-    --                 end
-    --             })
-    --         end
-    --     end
-    -- end
 
     do -- Priority Tab
         local row = Cassade:Row("SetPriorityRow", "SetPriority", "")
@@ -1665,6 +1969,7 @@ do
 
                     else
                         self.SetPriority(selected_function, num)
+                        self.SaveSetting()
                     end
 
                 else
@@ -1682,56 +1987,15 @@ do
     end
 
     do -- Setting Tab
-        -- do -- Tween Settings Form
-        --     do -- tween speed
-        --         local row = Cassade:Row("TweenSpeedRow", "TweenForm", "Tween Speed", "change how fast you fly.")
-        --         local lb = row:Right():Label({Text = math.round(self.Settings.TweenSpeed and self.Settings.TweenSpeed*10 or 30)})
-
-        --         row:Right():Slider({
-        --             Value = self.Settings.TweenSpeed and self.Settings.TweenSpeed/10 or 0.3,
-        --             ValueChanged = function(_self, value: number)
-        --                 self.Settings.TweenSpeed = value * 10
-        --                 lb.Text = math.round(self.Settings.TweenSpeed*10)
-        --             end,
-        --         })
-        --     end
-
-        --     do -- Y Pos
-        --         local row = Cassade:Row("YPosRow", "TweenForm", "Y position", "farm y distance.")
-        --         local lb = row:Right():Label({Text = math.round(self.Settings.YPos or 15)})
-
-        --         row:Right():Slider({
-        --             Value = self.Settings.YPos and self.Settings.YPos/30 or 0.5,
-        --             ValueChanged = function(_self, value: number)
-        --                 self.Settings.YPos = value * 30
-        --                 lb.Text = math.round(self.Settings.YPos)
-        --             end,
-        --         })
-        --     end
-
-        --     do -- teleport distance
-        --         local row = Cassade:Row("TeleportDistanceRow", "TweenForm", "Teleport distance", "teleport when distance lower than this.")
-        --         local lb = row:Right():Label({Text = math.round(self.Settings.TeleportAtDistance or 200)})
-
-        --         row:Right():Slider({
-        --             Value = self.Settings.TeleportAtDistance and self.Settings.TeleportAtDistance/500 or 0.4,
-
-        --             ValueChanged = function(_self, value: number)
-        --                 self.Settings.TeleportAtDistance = value * 500
-        --                 lb.Text = math.round(self.Settings.TeleportAtDistance)
-        --             end,
-        --         })
-        --     end
-        -- end
-
         do -- script Form
             do -- auto execute
-                local row = Cassade:Row("AutoExecuteRow", "ScriptSettings", "Auto Execute", "execute script when teleporting to another server.")
+                local row = Cassade:Row("AutoExecuteRow", "ScriptSettings", "Auto Execute", "execute script when teleport to another server.")
 
                 row:Right():Toggle({
                     Value = self.Settings.AutoExecute or false,
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoExecute = value
+                        self.SaveSetting()
                     end
                 })
             end
@@ -1756,9 +2020,10 @@ self.MainLoop = RunService.RenderStepped:Connect(function()
 
     for _, funcname in self.SortedPriority do
         local func_server = Priorities[funcname].Server
+        local func = PriorityFunctions[funcname]
 
-        if not self.PriorityFarming and setting[funcname] and (SERVERS[func_server] == game.PlaceId or not func_server) then
-            PriorityFunctions[funcname]()
+        if not self.PriorityFarming and setting[funcname] and func and (SERVERS[func_server] == game.PlaceId or not func_server) then
+            func()
         end
     end
 end)
@@ -1780,6 +2045,10 @@ getgenv().CleanUpApexHub = function()
         end
     end
 
+    for _, v in self.Troves do
+        v:Clean()
+    end
+
     self.SaveSetting()
     self.Noclip(false)
     self.Run(false)
@@ -1792,4 +2061,6 @@ getgenv().CleanUpApexHub = function()
     self.ESP(workspace:FindFirstChild("InGamePlayers"), false)
 
     pcall(function() self.app:Destroy() end)
+
+    self.Signal:Destroy()
 end
