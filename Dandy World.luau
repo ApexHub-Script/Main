@@ -1215,7 +1215,7 @@ function self.NormalMode()
             self.StopGenerate()
         end
 
-        hrp.CFrame = generator.ScrapsAttachPoint.CFrame
+        hrp.CFrame = CFrame.new(prompt.Position - Vector3.new(0, 3, 0))
         hrp.AssemblyLinearVelocity = Vector3.zero
 
         self.Generate(generator)
