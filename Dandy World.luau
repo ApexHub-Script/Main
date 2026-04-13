@@ -858,7 +858,7 @@ end
 function self.Generate(generator)
     local prompt = generator.Prompt.Attachment.ProximityPrompt
 
-    if fireproximityprompt then
+    if fireproximityprompt and getexecutorname() ~= "Xeno" then
         fireproximityprompt(prompt)
 
     else
@@ -875,7 +875,7 @@ function self.Generate(generator)
         prompt:InputHoldBegin()
         prompt:InputHoldEnd()
 
-        task.delay(0.1, ToggleItemPrompts, true)
+        ToggleItemPrompts(true)
     end
 end
 
