@@ -17,6 +17,8 @@ type Setting = {
     AutoJoinWithPlayer:     boolean,
     AutoJoinMatchMaking:    boolean,
     AutoReturnToLobby:      boolean,
+    AutoUseAbility:         boolean,
+
     ESPGenerator:           boolean,
     ESPTwisted:             boolean,
     ESPItem:                boolean,
@@ -629,7 +631,7 @@ function self.GetClosetMon(host: BasePart?, monnames: {string}?)
     return closetmon
 end
 
-function self.Noclip(noclip: boolean) -- incomplete
+function self.Noclip(noclip: boolean)
 
     if game.PlaceId ~= SERVERS.InGame then return end
     if not self.room or not self.room.Parent then return end
@@ -1195,6 +1197,10 @@ function self.DistractorGenCountCheck()
     end
 end
 
+function self.UseAblity(...)
+    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("AbilityEvent"):InvokeServer(...)
+end
+
 function self.NormalMode()
     local char = Player.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1589,6 +1595,31 @@ function AutomationFunctions.AutoReturnToLobby()
     end
 end
 
+function AutomationFunctions.AutoUseAbility()
+    local Character = Player.Character
+    local toon = Character and Character:GetAttribute("ModuleName")
+    local tape = tonumber(PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.PointBin.PointFrame.TextLabel.Text)
+
+    if not toon or not self.FloorActive() then return end
+
+    if toon == "Sprout" and tape >= 100 then
+        if Character.Abilities.Ability1.CurrentCooldown.Value ~= 0 then return end
+
+        for _, char in workspace.InGamePlayers:GetChildren() do
+            local hum = char:FindFirstChild("Humanoid")
+
+            if hum and hum.Health < hum.MaxHealth then
+                self.UseAblity(Character, char.HumanoidRootPart.CFrame, char)
+            end
+        end
+
+    elseif toon == "Vee" then
+        if Character.Abilities.Ability1.CurrentCooldown.Value ~= 0 then return end
+
+        self.UseAblity(Character, Character.HumanoidRootPart.CFrame, false)
+    end
+end
+
 -- ═══════════════════════════════════════════════════════════════
 --  🔰 INIT 🔰
 -- ═══════════════════════════════════════════════════════════════
@@ -1853,6 +1884,18 @@ do
                     ValueChanged = function(_self, value: boolean)
                         self.Settings.AutoNoclip = value
                         self.Signal:Fire("AutoNoclip", value)
+                        self.SaveSetting()
+                    end
+                })
+            end
+
+            do -- Auto Use Ability
+                local row = Cassade:Row("AutoUseAbilityRow", "AbilityForm", "Auto Use Ability")
+
+                row:Right():Toggle({
+                    Value = self.Settings.AutoUseAbility or false,
+                    ValueChanged = function(_self, value: boolean)
+                        self.Settings.AutoUseAbility = value
                         self.SaveSetting()
                     end
                 })
