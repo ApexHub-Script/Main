@@ -629,7 +629,7 @@ function self.GetClosetMon(host: BasePart?, monnames: {string}?)
     return closetmon
 end
 
-function self.Noclip(noclip: boolean)
+function self.Noclip(noclip: boolean) -- incomplete
 
     if game.PlaceId ~= SERVERS.InGame then return end
     if not self.room or not self.room.Parent then return end
@@ -644,23 +644,25 @@ function self.Noclip(noclip: boolean)
     local function search(path: Instance, mode: "Exlude" | "Include", filter: {string})
         local expectType = if mode == "Exclude" then "nil" else "number"
 
-        local function check(parts: {Instance})
-            for _, part in parts do
-                if part:IsA("BasePart") and type(table.find(filter, part.Name)) == expectType then
-                    part.CanCollide = not noclip
-                end
+        local function check(part: Instance)
+            if part:IsA("BasePart") and type(table.find(filter, part.Name)) == expectType then
+                part.CanCollide = not noclip
             end
+        end
+
+        local function CheckChildren(child)
+            for _, v in child:GetDescendants() do
+                check(v)
+            end
+
+            child.DescendantAdded:Connect(check)
         end
 
         for _, v in path:GetChildren() do
-            check(v:GetDescendants())
-
-            if v.Name == "Generator" then
-                if not v:FindFirstChild("Model") then continue end
-
-                check(v.Model:GetChildren())
-            end
+            CheckChildren(v)
         end
+
+        path.ChildAdded:Connect(CheckChildren)
     end
 
     local function CheckPath(path)
@@ -862,8 +864,18 @@ function self.Generate(generator)
     else
         workspace.CurrentCamera.CFrame = CFrame.lookAt(workspace.CurrentCamera.CFrame.Position, Vector3.new(-712.4114379882812, 101.15324401855469, -154.66770935058594) + Vector3.new(-0.8370537757873535, 0, 3.4483642578125))
 
+        local function ToggleItemPrompts(enable: boolean)
+            for _, v in self.room.Items:GetChildren() do
+                v.Prompt.ProximityPrompt.Enabled = enable
+            end
+        end
+
+        ToggleItemPrompts(false)
+
         prompt:InputHoldBegin()
         prompt:InputHoldEnd()
+
+        task.delay(0.1, ToggleItemPrompts, true)
     end
 end
 
