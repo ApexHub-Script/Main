@@ -866,26 +866,29 @@ function self.Generate(generator)
     else
         workspace.CurrentCamera.CFrame = CFrame.lookAt(workspace.CurrentCamera.CFrame.Position, Vector3.new(-712.4114379882812, 101.15324401855469, -154.66770935058594) + Vector3.new(-0.8370537757873535, 0, 3.4483642578125))
 
-        if self._firing_gen_prompt then return end
+        local char = Player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-        self._firing_gen_prompt = true
+        if not hrp then return end
 
         local function ToggleItemPrompts(enable: boolean)
+            local childs = self.room.Items:GetChildren()
+
+            if childs[1] and childs[1].Prompt.ProximityPrompt.Enabled == enable then return end
+
             for _, v in self.room.Items:GetChildren() do
                 v.Prompt.ProximityPrompt.Enabled = enable
             end
         end
 
-        ToggleItemPrompts(false)
-
-        task.delay(0.3, function()
+        if not hrp.Anchored then
+            ToggleItemPrompts(false)
             prompt:InputHoldBegin()
             prompt:InputHoldEnd()
 
+        else
             ToggleItemPrompts(true)
-
-            self._firing_gen_prompt = false
-        end)
+        end
     end
 end
 
