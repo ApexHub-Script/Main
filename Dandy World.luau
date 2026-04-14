@@ -1606,6 +1606,8 @@ function AutomationFunctions.AutoUseAbility()
         if Character.Abilities.Ability1.CurrentCooldown.Value ~= 0 then return end
 
         for _, char in workspace.InGamePlayers:GetChildren() do
+            if char == Character then continue end
+
             local hum = char:FindFirstChild("Humanoid")
 
             if hum and hum.Health < hum.MaxHealth then
