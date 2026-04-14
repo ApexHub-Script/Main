@@ -864,7 +864,7 @@ function self.Generate(generator)
         fireproximityprompt(prompt)
 
     else
-        workspace.CurrentCamera.CFrame = CFrame.lookAt(workspace.CurrentCamera.CFrame.Position, Vector3.new(-712.4114379882812, 101.15324401855469, -154.66770935058594) + Vector3.new(-0.8370537757873535, 0, 3.4483642578125))
+        workspace.CurrentCamera.CFrame = CFrame.lookAt(workspace.CurrentCamera.CFrame.Position, prompt.Parent.Parent.Position + prompt.Parent.Position)
 
         local char = Player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
