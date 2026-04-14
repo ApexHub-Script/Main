@@ -830,12 +830,14 @@ function self.GetAvailableGenerator(): Model
         end
 
         for _, char in workspace.InGamePlayers:GetChildren() do
-            if char == Player.Character then continue end
-
             local charHrp = char:FindFirstChild("HumanoidRootPart")
 
             if charHrp and (charHrp.Position - generator.Prompt.Position).Magnitude < (charHrp.Anchored and 10 or 20) then
-                dangerous = true
+                if char == Player.Character then
+                    dangerous = false
+                else
+                    dangerous = true
+                end
 
                 break
             end
