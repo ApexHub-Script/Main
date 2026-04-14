@@ -879,6 +879,10 @@ function self.Generate(generator)
             for _, v in self.room.Items:GetChildren() do
                 v.Prompt.ProximityPrompt.Enabled = enable
             end
+
+            if enable then
+                self._enable_item_delay = nil
+            end
         end
 
         if not hrp.Anchored then
@@ -886,8 +890,11 @@ function self.Generate(generator)
             prompt:InputHoldBegin()
             prompt:InputHoldEnd()
 
-        else
-            ToggleItemPrompts(true)
+            if self._enable_item_delay then
+                self._enable_item_delay = task.cancel(self._enable_item_delay)
+            end
+
+            self._enable_item_delay = task.delay(1, ToggleItemPrompts, true)
         end
     end
 end
@@ -1599,6 +1606,8 @@ function AutomationFunctions.AutoReturnToLobby()
 end
 
 function AutomationFunctions.AutoUseAbility()
+    if game.PlaceId ~= SERVERS.InGame then return end
+
     local Character = Player.Character
     local toon = Character and Character:GetAttribute("ModuleName")
     local tape = tonumber(PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.PointBin.PointFrame.TextLabel.Text)
